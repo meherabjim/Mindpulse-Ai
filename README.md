@@ -33,3 +33,15 @@ MindPulse provides informational wellness support. It is not a diagnostic tool, 
 ## Development Status
 
 The project is under active development. Experimental model results are not presented as evidence of clinical validity or production readiness.
+
+<!-- BEGIN MINDPULSE DATASET DOCUMENTATION -->
+## Dataset and Responsible-AI Documentation
+
+The repository includes a 5,000-record synthetic demo dataset for non-clinical engineering experiments.
+
+- [Dataset Card](docs/research/DATASET_CARD.md)
+- [Data Dictionary](docs/research/DATA_DICTIONARY.md)
+- [Data Directory Guide](ai_service/data/README.md)
+
+Synthetic results are not evidence of clinical effectiveness or production readiness.
+<!-- END MINDPULSE DATASET DOCUMENTATION -->

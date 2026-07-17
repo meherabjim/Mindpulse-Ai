@@ -134,3 +134,10 @@ Thumbs.db
 **/*_output.txt
 
 # END MINDPULSE PORTFOLIO CLEANUP
+
+# BEGIN MINDPULSE LOCAL DATASET AUDITS
+/dataset_publication_audit.txt
+/dataset_candidate_detail_audit.txt
+dataset_*_audit.txt
+**/dataset_*_audit.txt
+# END MINDPULSE LOCAL DATASET AUDITS
