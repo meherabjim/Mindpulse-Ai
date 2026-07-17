@@ -1,0 +1,136 @@
+
+# BEGIN MINDPULSE PUBLIC SAFETY
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+
+# Credentials and signing files
+local.properties
+**/local.properties
+key.properties
+**/key.properties
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+service-account*.json
+credentials*.json
+client_secret*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Dependencies and Python environments
+node_modules/
+**/node_modules/
+.venv/
+**/.venv/
+venv/
+**/venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+**/.pytest_cache/
+
+# Flutter and Android generated files
+.dart_tool/
+**/.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+**/build/
+android/.gradle/
+**/android/.gradle/
+*.apk
+*.aab
+
+# Private runtime artifacts
+backups/
+**/backups/
+logs/
+**/logs/
+reports/
+**/reports/
+*.log
+*.tmp
+temp/
+**/temp/
+.tmp/
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+
+# IDE and operating-system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# END MINDPULSE PUBLIC SAFETY
+
+# BEGIN MINDPULSE PRIVATE DEVELOPMENT ARTIFACTS
+
+# Local development context containing personal test information
+/account_settings_development_context.txt
+
+# One-time repair utility containing a local Windows path
+/ai_service/training/repair_screen_time_native_patch.py
+
+# END MINDPULSE PRIVATE DEVELOPMENT ARTIFACTS
+
+# BEGIN MINDPULSE DEVELOPMENT SNAPSHOTS
+
+# Local development transcripts and context exports
+*_development_context.txt
+**/*_development_context.txt
+
+# Temporary source snapshots
+*_current_source.txt
+**/*_current_source.txt
+
+# Local Dart backup snapshots
+*.backup.dart
+**/*.backup.dart
+*.before-*.dart
+**/*.before-*.dart
+
+# END MINDPULSE DEVELOPMENT SNAPSHOTS
+
+# BEGIN MINDPULSE PORTFOLIO CLEANUP
+
+# Historical source snapshots
+*.before_*.dart
+**/*.before_*.dart
+*.before-*.dart
+**/*.before-*.dart
+*.backup*.dart
+**/*.backup*.dart
+
+# Local development exports
+*_development_context.txt
+**/*_development_context.txt
+*_context.txt
+**/*_context.txt
+*_current_source.txt
+**/*_current_source.txt
+*_output.txt
+**/*_output.txt
+
+# END MINDPULSE PORTFOLIO CLEANUP

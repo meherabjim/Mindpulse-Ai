@@ -1,0 +1,35 @@
+﻿id	name	minimum_points	maximum_points	display_order	is_active
+1	Beginner	0	99	1	1
+2	Balanced	100	249	2	1
+3	Focused	250	499	3	1
+4	Resilient	500	999	4	1
+5	MindPulse Master	1000	NULL	5	1
+id	badge_code	name	category	criteria_type	criteria_value	points_reward	is_active
+1	FIRST_CHECKIN	First Check-in	checkin	total_checkins	1.00	10	1
+2	CHECKIN_7_DAY	7-Day Check-in	checkin	checkin_streak	7.00	30	1
+3	CHECKIN_30_DAY	30-Day Check-in	consistency	checkin_streak	30.00	100	1
+4	WATER_HERO	Water Hero	hydration	hydration_target_days	7.00	25	1
+5	SLEEP_CHAMPION	Sleep Champion	sleep	sleep_target_days	7.00	25	1
+6	CALM_MIND	Calm Mind	recovery	calm_activity_count	10.00	40	1
+7	JOURNAL_STREAK	Journal Streak	journal	journal_streak	7.00	35	1
+8	ACTIVE_WALKER	Active Walker	activity	walking_completion_count	10.00	30	1
+9	HABIT_BUILDER	Habit Builder	habit	habit_completion_count	25.00	50	1
+10	RECOVERY_MILESTONE	Recovery Milestone	recovery	recovery_score	75.00	60	1
+11	WELLNESS_EXPLORER	Wellness Explorer	wellness	wellness_scan_count	5.00	30	1
+id	template_code	notification_type	title_template	body_template	available_variables	is_active
+1	DAILY_CHECKIN_REMINDER	checkin_reminder	Time for your daily check-in	Take a moment to record your mood, stress, sleep, and energy.	["user_name"]	1
+2	HABIT_REMINDER	habit_reminder	Habit reminder	Your {{habit_name}} goal is waiting for you.	["user_name","habit_name"]	1
+3	SLEEP_REMINDER	sleep_reminder	Prepare for healthy sleep	Start your wind-down routine and prepare for a restful night.	["user_name"]	1
+4	RECOVERY_REMINDER	recovery_reminder	Recovery activity reminder	A short {{activity_name}} session may help you reset.	["user_name","activity_name"]	1
+5	WELLNESS_SCAN_REMINDER	wellness_scan_reminder	Complete your wellness scan	Review your recent wellness condition with a short assessment.	["user_name"]	1
+6	WEEKLY_REPORT_READY	report_ready	Your weekly report is ready	View your recent mood, stress, sleep, habit, and recovery trends.	["user_name","report_period"]	1
+7	ACHIEVEMENT_EARNED	achievement	New achievement unlocked	You earned the {{badge_name}} badge.	["user_name","badge_name"]	1
+8	INACTIVITY_REMINDER	inactivity	Your wellness journey is waiting	Return to MindPulse AI and complete a short wellness activity.	["user_name","inactive_days"]	1
+9	GENERAL_ANNOUNCEMENT	announcement	{{announcement_title}}	{{announcement_body}}	["announcement_title","announcement_body"]	1
+id	content_key	content_type	title	version	language_code	is_active	published_at
+1	wellness_disclaimer	wellness_disclaimer	Wellness Disclaimer	1.0	en	1	2026-07-11 17:05:13
+2	about_mindpulse	about	About MindPulse AI	1.0	en	1	2026-07-11 17:05:13
+3	privacy_policy_draft	privacy_policy	Privacy Policy Draft	1.0	en	0	NULL
+4	terms_draft	terms	Terms and Conditions Draft	1.0	en	0	NULL
+admin_user_count
+0

@@ -1,0 +1,68 @@
+MindPulse AI - Final User-Facing Terminology Audit
+========================================================================
+
+Generated: 2026-07-16T17:53:22.849801+00:00
+
+Changes:
+- mobile_app\lib\features\ai\screens\ai_wellness_screen.dart: 'Use the most recent available burnout indicator. A higher value increases the combined strain indicator.' -> 'Use the most recent available wellness strain indicator. A higher value increases the combined strain indicator.' (1 occurrence(s))
+- mobile_app\lib\features\ai\screens\ml_wellness_prediction_screen.dart: 'Enter today’s indicators to estimate burnout, ' -> 'Enter today’s indicators to estimate wellness patterns, ' (1 occurrence(s))
+- mobile_app\lib\features\ai\screens\ml_wellness_prediction_screen.dart: "title: 'Burnout risk'," -> "title: 'Wellness strain indicator'," (1 occurrence(s))
+
+Exact replacements applied: 3
+
+User-facing verification:
+- Burnout indicator sentence removed: YES
+- Estimate burnout sentence removed: YES
+- Burnout risk title removed: YES
+
+Remaining internal compatibility occurrences:
+- mobile_app\lib\features\ai\screens\ai_wellness_screen.dart:31: double _burnoutScore = 40;
+- mobile_app\lib\features\ai\screens\ai_wellness_screen.dart:106: burnoutScore: _burnoutScore,
+- mobile_app\lib\features\ai\screens\ai_wellness_screen.dart:399: value: _burnoutScore,
+- mobile_app\lib\features\ai\screens\ai_wellness_screen.dart:403: valueLabel: '${_burnoutScore.round()} / 100',
+- mobile_app\lib\features\ai\screens\ai_wellness_screen.dart:406: _burnoutScore = value;
+- mobile_app\lib\features\ai\screens\ml_wellness_prediction_screen.dart:479: prediction: _asMap(predictions['burnout']),
+- mobile_app\lib\features\ai\services\ai_mobile_service.dart:44: required double burnoutScore,
+- mobile_app\lib\features\ai\services\ai_mobile_service.dart:55: 'burnout_score': burnoutScore,
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:530: final burnoutScore = _doubleValue(
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:531: _todayCheckin!['burnout_score'],
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:537: _todayCheckin!['burnout_risk_level']?.toString() ??
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:556: if (burnoutScore > 0) ...[
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:560: '${burnoutScore.toStringAsFixed(1)} / 100',
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:564: value: (burnoutScore / 100).clamp(0.0, 1.0).toDouble(),
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:689: final burnout = _doubleValue(checkin['burnout_score'], fallback: 0);
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:693: checkin['burnout_risk_level']?.toString() ??
+- mobile_app\lib\features\recovery\screens\recovery_screen.dart:931: double _burnout = 30;
+- mobile_app\lib\features\recovery\screens\recovery_screen.dart:968: burnoutScore: _burnout,
+- mobile_app\lib\features\recovery\screens\recovery_screen.dart:1083: value: _burnout,
+- mobile_app\lib\features\recovery\screens\recovery_screen.dart:1087: _burnout = value;
+- mobile_app\lib\features\recovery\services\recovery_service.dart:186: required double burnoutScore,
+- mobile_app\lib\features\recovery\services\recovery_service.dart:200: 'burnout_score': burnoutScore,
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:193: case 'burnout':
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:332: final burnout = _asMap(metrics['burnout']);
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:506: required Map<String, dynamic> burnout,
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:588: value: '${_displayNumber(burnout['average_score'])} / 100',
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:595: burnout['latest_risk_level']?.toString().toUpperCase() ?? '—',
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:648: Map<String, dynamic> burnout,
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:684: value: _numberValue(burnout['average_score']),
+- mobile_app\lib\features\wellness\screens\wellness_scan_screen.dart:486: final score = _doubleValue(assessment['burnout_score']);
+- mobile_app\lib\features\wellness\services\wellness_scan_service.dart:83: final response = await _client.get('/burnout/latest');
+
+Remaining occurrences requiring manual review:
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:716: if (burnout > 0)
+- mobile_app\lib\features\checkin\screens\daily_checkin_screen.dart:719: '${burnout.toStringAsFixed(1)} / 100'
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:361: burnout: burnout,
+- mobile_app\lib\features\reports\screens\weekly_report_screen.dart:366: _buildIndicators(checkins, habits, recovery, burnout),
+- mobile_app\lib\features\wellness\screens\wellness_scan_screen.dart:22: Map<String, dynamic>? _latestBurnout;
+- mobile_app\lib\features\wellness\screens\wellness_scan_screen.dart:44: _service.getLatestBurnout(),
+- mobile_app\lib\features\wellness\screens\wellness_scan_screen.dart:60: _latestBurnout = results[3] as Map<String, dynamic>?;
+- mobile_app\lib\features\wellness\screens\wellness_scan_screen.dart:234: if (_latestBurnout != null) ...[
+- mobile_app\lib\features\wellness\screens\wellness_scan_screen.dart:236: _buildBurnoutCard(),
+- mobile_app\lib\features\wellness\screens\wellness_scan_screen.dart:483: Widget _buildBurnoutCard() {
+- mobile_app\lib\features\wellness\screens\wellness_scan_screen.dart:484: final assessment = _latestBurnout!;
+- mobile_app\lib\features\wellness\services\wellness_scan_service.dart:82: Future<Map<String, dynamic>?> getLatestBurnout() async {
+
+Decision:
+- Internal variable names, JSON keys, API paths and database-compatible identifiers remain unchanged.
+- User-facing wording now uses wellness strain or wellness patterns.
+- No backend source, database schema or model artifact was modified.
