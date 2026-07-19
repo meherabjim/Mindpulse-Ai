@@ -7,7 +7,16 @@ import '../../auth/screens/login_screen.dart';
 import '../../auth/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({
+    super.key,
+    this.authChecker,
+    this.authenticatedBuilder,
+    this.unauthenticatedBuilder,
+  });
+
+  final Future<bool> Function()? authChecker;
+  final WidgetBuilder? authenticatedBuilder;
+  final WidgetBuilder? unauthenticatedBuilder;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -51,7 +60,8 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    final loggedIn = await AuthService().isLoggedIn();
+    final loggedIn =
+        await (widget.authChecker?.call() ?? AuthService().isLoggedIn());
 
     if (!mounted) return;
 
@@ -68,7 +78,8 @@ class _SplashScreenState extends State<SplashScreen>
         transitionDuration: const Duration(milliseconds: 450),
 
         pageBuilder: (context, animation, secondaryAnimation) {
-          return const OnboardingGate();
+          return widget.authenticatedBuilder?.call(context) ??
+              const OnboardingGate();
         },
 
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -84,7 +95,8 @@ class _SplashScreenState extends State<SplashScreen>
         transitionDuration: const Duration(milliseconds: 450),
 
         pageBuilder: (context, animation, secondaryAnimation) {
-          return const LoginScreen();
+          return widget.unauthenticatedBuilder?.call(context) ??
+              const LoginScreen();
         },
 
         transitionsBuilder: (context, animation, secondaryAnimation, child) {

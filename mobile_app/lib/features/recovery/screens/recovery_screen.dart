@@ -660,14 +660,18 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            item['progress_date']?.toString() ?? '',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
+                          Expanded(
+                            child: Text(
+                              item['progress_date']?.toString() ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 12),
                           Text(
                             '${score.toStringAsFixed(1)} / 100',
                             style: const TextStyle(

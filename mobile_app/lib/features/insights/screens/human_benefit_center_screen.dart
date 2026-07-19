@@ -333,11 +333,11 @@ class _HumanBenefitCenterScreenState extends State<HumanBenefitCenterScreen>
         const SizedBox(height: 6),
         const Text('Local aggregate observations from this device.'),
         const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
+        GridView.extent(
+          maxCrossAxisExtent: 360,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
-          childAspectRatio: 1.25,
+          childAspectRatio: 1.6,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
@@ -393,11 +393,11 @@ class _HumanBenefitCenterScreenState extends State<HumanBenefitCenterScreen>
           'Recorded activity and voluntary feedback from your account.',
         ),
         const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
+        GridView.extent(
+          maxCrossAxisExtent: 360,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
-          childAspectRatio: 1.25,
+          childAspectRatio: 1.6,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [

@@ -547,9 +547,11 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
               children: [
                 Icon(Icons.verified_outlined, color: Colors.green),
                 SizedBox(width: 8),
-                Text(
-                  'Today’s check-in saved',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                Expanded(
+                  child: Text(
+                    'Today’s check-in saved',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                  ),
                 ),
               ],
             ),

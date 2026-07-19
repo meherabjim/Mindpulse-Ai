@@ -419,23 +419,31 @@ class _WellnessScanScreenState extends State<WellnessScanScreen> {
                 ],
               ),
               const SizedBox(height: 17),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  Text(
-                    score.toStringAsFixed(1),
-                    style: TextStyle(
-                      fontSize: 38,
-                      height: 1,
-                      fontWeight: FontWeight.w900,
-                      color: riskColor,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        score.toStringAsFixed(1),
+                        style: TextStyle(
+                          fontSize: 38,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                          color: riskColor,
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4, bottom: 4),
+                        child: Text('/ 100'),
+                      ),
+                    ],
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 4),
-                    child: Text('/ 100'),
-                  ),
-                  const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -804,7 +812,11 @@ class _WellnessQuestionnaireScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 6,
             children: [
               Text(
                 'Question ${_currentIndex + 1} '
@@ -814,7 +826,6 @@ class _WellnessQuestionnaireScreenState
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const Spacer(),
               Text(
                 '${_answers.length} answered',
                 style: const TextStyle(color: Color(0xFF74748A)),

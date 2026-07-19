@@ -315,11 +315,11 @@ class _ScreenTimeInsightsScreenState extends State<ScreenTimeInsightsScreen>
           const SizedBox(height: 5),
           Text(_comparison(difference)),
           const SizedBox(height: 14),
-          GridView.count(
-            crossAxisCount: 2,
+          GridView.extent(
+            maxCrossAxisExtent: 360,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
-            childAspectRatio: 1.25,
+            childAspectRatio: 1.6,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [

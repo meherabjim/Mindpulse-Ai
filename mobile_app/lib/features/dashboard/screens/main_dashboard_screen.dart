@@ -233,31 +233,39 @@ class DashboardHomeTab extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          const Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          const Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: 12,
+            runSpacing: 12,
             children: [
-              Text(
-                '38.5',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 42,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
-              ),
-              SizedBox(width: 4),
-              Padding(
-                padding: EdgeInsets.only(bottom: 5),
-                child: Text(
-                  '/ 100',
-                  style: TextStyle(
-                    color: Color(0xFFDCD9FF),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '38.5',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 42,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
                   ),
-                ),
+                  SizedBox(width: 4),
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 5),
+                    child: Text(
+                      '/ 100',
+                      style: TextStyle(
+                        color: Color(0xFFDCD9FF),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Spacer(),
               _RiskBadge(),
             ],
           ),
@@ -423,8 +431,8 @@ class DashboardHomeTab extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: tools.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 240,
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
         mainAxisExtent: 190,

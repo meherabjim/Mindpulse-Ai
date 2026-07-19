@@ -1,0 +1,65 @@
+{
+  "schema_version": "mindpulse-runtime-model-manifest-1",
+  "generated_at": "2026-07-18T20:55:05.163953+00:00",
+  "production_ready": false,
+  "training_data_type": "hybrid_rule_and_synthetic_demo",
+  "important_warning": "Burnout uses transparent wellness rule version 1.0.0. Stress and mood use portable Logistic Regression models trained on synthetic demo data. Results are not clinical evidence and are not approved for production use.",
+  "components": {
+    "burnout": {
+      "task": "burnout",
+      "engine_type": "transparent_rule",
+      "model_file": null,
+      "model_version": "wellness-rule-1.0.0",
+      "training_data_type": "not_applicable_rule_based",
+      "production_ready": false,
+      "feature_count": 4,
+      "labels": [
+        "low",
+        "mild",
+        "moderate",
+        "elevated"
+      ]
+    },
+    "stress": {
+      "task": "stress",
+      "engine_type": "portable_logistic_json",
+      "model_file": "stress_model.json",
+      "model_version": "stress-portable-demo-1.0.0",
+      "training_data_type": "synthetic_demo",
+      "production_ready": false,
+      "feature_count": 11,
+      "labels": [
+        "high",
+        "low",
+        "mild",
+        "moderate"
+      ],
+      "source_candidate_sha256": "e9240399fd2ff6835f0f188518adf0d896ec38462cbc9be2ebc2325e4e8a5cd4"
+    },
+    "mood": {
+      "task": "mood",
+      "engine_type": "portable_logistic_json",
+      "model_file": "mood_model.json",
+      "model_version": "mood-portable-demo-1.0.0",
+      "training_data_type": "synthetic_demo",
+      "production_ready": false,
+      "feature_count": 11,
+      "labels": [
+        "good",
+        "low",
+        "neutral"
+      ],
+      "source_candidate_sha256": "3afe4b7d21d0a0a49313cd14dc5af51c0559aa35119657f92cb9b3ff0bbe70c8"
+    }
+  },
+  "legacy_artifacts": {
+    "retained": true,
+    "loaded_at_runtime": false,
+    "files": [
+      "burnout_model.joblib",
+      "stress_model.joblib",
+      "mood_model.joblib",
+      "model_metadata.json"
+    ]
+  }
+}

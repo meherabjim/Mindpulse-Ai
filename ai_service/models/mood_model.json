@@ -1,0 +1,182 @@
+{
+  "schema_version": "mindpulse-portable-logistic-1",
+  "task": "mood",
+  "target": "mood_class",
+  "model_version": "mood-portable-demo-1.0.0",
+  "algorithm": "multinomial_logistic_regression",
+  "training_data_type": "synthetic_demo",
+  "production_ready": false,
+  "features": [
+    "stress_level",
+    "energy_level",
+    "sleep_hours",
+    "sleep_quality",
+    "focus_level",
+    "motivation_level",
+    "restlessness_level",
+    "work_study_pressure",
+    "physical_activity_minutes",
+    "hydration_cups",
+    "social_withdrawal"
+  ],
+  "labels": [
+    "good",
+    "low",
+    "neutral"
+  ],
+  "preprocessing": {
+    "type": "standard_scaler",
+    "mean": [
+      2.96875,
+      2.98675,
+      6.755850000000001,
+      3.01125,
+      3.01475,
+      2.993,
+      3.03675,
+      2.9575,
+      59.99275,
+      5.966,
+      3.00425
+    ],
+    "scale": [
+      1.3925779825560938,
+      1.4105227532727007,
+      1.7610411061357993,
+      1.4186696012461817,
+      1.419870570685934,
+      1.4149031768993947,
+      1.4287755028345075,
+      1.3936261155704568,
+      34.50118400051657,
+      3.7469779823212197,
+      1.411641575436201
+    ]
+  },
+  "classifier": {
+    "solver": "lbfgs",
+    "class_weight": "balanced",
+    "coefficients": [
+      [
+        -0.05014857745361673,
+        1.8856578417858116,
+        0.01638335857588069,
+        1.2223488895800083,
+        1.246411155640904,
+        1.7934855147509032,
+        -0.5939865724456637,
+        -0.7379958652806073,
+        0.06569752510356587,
+        -0.06699905938227356,
+        -0.409087247002078
+      ],
+      [
+        0.03604094922863803,
+        -1.9019330299743908,
+        0.0013164512693376095,
+        -1.2420072188650872,
+        -1.2606756103607735,
+        -1.7577238306929326,
+        0.6244797242212873,
+        0.762343958486369,
+        -0.04444521218605222,
+        0.10577438439683752,
+        0.42258577001908815
+      ],
+      [
+        0.014107628224978859,
+        0.01627518818858595,
+        -0.01769980984521918,
+        0.01965832928507741,
+        0.014264454719863089,
+        -0.03576168405797176,
+        -0.03049315177562725,
+        -0.02434809320575972,
+        -0.02125231291751378,
+        -0.03877532501456564,
+        -0.013498523017008513
+      ]
+    ],
+    "intercepts": [
+      -0.9961701318436226,
+      -0.2639683416067416,
+      1.2601384734503625
+    ]
+  },
+  "training": {
+    "dataset_path": "data/processed/demo_training_data.csv",
+    "dataset_sha256": "2b997261f3b01211c706b55ad0e5fa4cb53d690d47b1c262240b52b809dc9e26",
+    "random_state": 42,
+    "test_size": 0.2,
+    "cv_folds": 5,
+    "source_candidate_sha256": "3afe4b7d21d0a0a49313cd14dc5af51c0559aa35119657f92cb9b3ff0bbe70c8"
+  },
+  "runtime": {
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy": "2.5.1",
+    "pandas": "3.0.3",
+    "scikit_learn": "1.9.0"
+  },
+  "evaluation": {
+    "rows": 5000,
+    "train_rows": 4000,
+    "test_rows": 1000,
+    "duplicate_feature_rows_removed": 0,
+    "conflicting_feature_vectors": 0,
+    "cv_macro_f1_mean": 0.7405048810749458,
+    "cv_macro_f1_std": 0.006567728619318225,
+    "cv_balanced_accuracy_mean": 0.7746469763886484,
+    "test": {
+      "macro_f1": 0.7402331565436984,
+      "weighted_f1": 0.7383242396095302,
+      "balanced_accuracy": 0.7766134815605206,
+      "minimum_class_f1": 0.7308488612836439,
+      "minimum_class_recall": 0.6585820895522388,
+      "weakest_f1_class": "neutral",
+      "weakest_recall_class": "neutral",
+      "class_metrics": {
+        "good": {
+          "precision": 0.6448979591836734,
+          "recall": 0.8540540540540541,
+          "f1": 0.7348837209302326,
+          "support": 185
+        },
+        "low": {
+          "precision": 0.7015384615384616,
+          "recall": 0.8172043010752689,
+          "f1": 0.7549668874172185,
+          "support": 279
+        },
+        "neutral": {
+          "precision": 0.8209302325581396,
+          "recall": 0.6585820895522388,
+          "f1": 0.7308488612836439,
+          "support": 536
+        }
+      },
+      "confusion_matrix": [
+        [
+          158,
+          1,
+          26
+        ],
+        [
+          0,
+          228,
+          51
+        ],
+        [
+          87,
+          96,
+          353
+        ]
+      ]
+    },
+    "generalization_gap": 0.00027172453124746365
+  },
+  "warning": "This portable model was trained and evaluated only on synthetic demo data. It is active only for experimental wellness-support functionality. It is not clinical evidence and is not approved for production use.",
+  "runtime_role": "active_experimental",
+  "artifact_format": "portable_json",
+  "source_candidate_sha256": "3afe4b7d21d0a0a49313cd14dc5af51c0559aa35119657f92cb9b3ff0bbe70c8"
+}
