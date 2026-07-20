@@ -1,5 +1,6 @@
 ﻿const express = require('express');
 const cors = require('cors');
+const { buildCorsOptions } = require('./config/cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
@@ -60,7 +61,7 @@ function getCorsOptions() {
 }
 
 app.use(helmet());
-app.use(cors(getCorsOptions()));
+app.use(cors(buildCorsOptions(getCorsOptions())));
 
 app.use(
     morgan(

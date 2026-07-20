@@ -206,3 +206,334 @@ test(
     );
   },
 );
+
+// MINDPULSE_CORS_POLICY_TESTS_V2
+const {
+  test: corsPolicyTest,
+} = require('node:test');
+
+const corsPolicyAssert = require(
+  'node:assert/strict',
+);
+
+const corsPolicyHttp = require('node:http');
+
+const {
+  DEFAULT_DEVELOPMENT_ORIGINS,
+  buildCorsOptions,
+  parseAllowedOrigins,
+  parseBoolean,
+} = require('../src/config/cors');
+
+const corsRuntimeApp = require('../src/app');
+
+function invokeOriginCallback(options, origin) {
+  return new Promise((resolve, reject) => {
+    options.origin(origin, (error, allowed) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(allowed);
+    });
+  });
+}
+
+function requestRuntimeApp(origin) {
+  return new Promise((resolve, reject) => {
+    const server = corsPolicyHttp.createServer(
+      corsRuntimeApp,
+    );
+
+    let finished = false;
+
+    function complete(error, result) {
+      if (finished) {
+        return;
+      }
+
+      finished = true;
+
+      server.close(() => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(result);
+      });
+    }
+
+    server.once('error', (error) => {
+      complete(error);
+    });
+
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+
+      if (
+        !address ||
+        typeof address === 'string'
+      ) {
+        complete(
+          new Error(
+            'Could not resolve temporary test port.',
+          ),
+        );
+        return;
+      }
+
+      const headers = {};
+
+      if (origin) {
+        headers.Origin = origin;
+      }
+
+      const request = corsPolicyHttp.request(
+        {
+          hostname: '127.0.0.1',
+          port: address.port,
+          path: '/api/v1/health',
+          method: 'GET',
+          headers,
+        },
+        (response) => {
+          const chunks = [];
+
+          response.on('data', (chunk) => {
+            chunks.push(chunk);
+          });
+
+          response.on('end', () => {
+            complete(null, {
+              statusCode: response.statusCode,
+              headers: response.headers,
+              body: Buffer.concat(chunks)
+                .toString('utf8'),
+            });
+          });
+        },
+      );
+
+      request.once('error', (error) => {
+        complete(error);
+      });
+
+      request.end();
+    });
+  });
+}
+
+corsPolicyTest(
+  'CORS parser trims and removes duplicate origins',
+  () => {
+    const origins = parseAllowedOrigins(
+      ' https://app.example.com,'
+        + 'https://admin.example.com,'
+        + 'https://app.example.com ',
+      'production',
+    );
+
+    corsPolicyAssert.deepEqual(origins, [
+      'https://app.example.com',
+      'https://admin.example.com',
+    ]);
+  },
+);
+
+corsPolicyTest(
+  'CORS wildcard configuration is rejected',
+  () => {
+    corsPolicyAssert.throws(
+      () => parseAllowedOrigins(
+        'https://app.example.com,*',
+        'production',
+      ),
+      /must not contain a wildcard/,
+    );
+  },
+);
+
+corsPolicyTest(
+  'production requires an explicit CORS allowlist',
+  () => {
+    corsPolicyAssert.throws(
+      () => parseAllowedOrigins(
+        '',
+        'production',
+      ),
+      /is required in production/,
+    );
+  },
+);
+
+corsPolicyTest(
+  'development receives non-wildcard local defaults',
+  () => {
+    const origins = parseAllowedOrigins(
+      '',
+      'development',
+    );
+
+    corsPolicyAssert.deepEqual(
+      origins,
+      [...DEFAULT_DEVELOPMENT_ORIGINS],
+    );
+
+    corsPolicyAssert.equal(
+      origins.includes('*'),
+      false,
+    );
+  },
+);
+
+corsPolicyTest(
+  'CORS boolean parser validates supported values',
+  () => {
+    corsPolicyAssert.equal(
+      parseBoolean('true'),
+      true,
+    );
+
+    corsPolicyAssert.equal(
+      parseBoolean('0'),
+      false,
+    );
+
+    corsPolicyAssert.throws(
+      () => parseBoolean('maybe'),
+      /must be a boolean value/,
+    );
+  },
+);
+
+corsPolicyTest(
+  'CORS policy preserves safe base options',
+  () => {
+    const options = buildCorsOptions(
+      {
+        methods: ['GET', 'POST'],
+        allowedHeaders: [
+          'Content-Type',
+          'Authorization',
+        ],
+      },
+      {
+        rawOrigins: 'https://app.example.com',
+        nodeEnv: 'production',
+        allowCredentials: 'false',
+      },
+    );
+
+    corsPolicyAssert.deepEqual(
+      options.methods,
+      ['GET', 'POST'],
+    );
+
+    corsPolicyAssert.deepEqual(
+      options.allowedHeaders,
+      [
+        'Content-Type',
+        'Authorization',
+      ],
+    );
+
+    corsPolicyAssert.equal(
+      options.credentials,
+      false,
+    );
+  },
+);
+
+corsPolicyTest(
+  'CORS callback accepts configured and non-browser requests',
+  async () => {
+    const options = buildCorsOptions(
+      {},
+      {
+        rawOrigins: 'https://app.example.com',
+        nodeEnv: 'production',
+        allowCredentials: 'false',
+      },
+    );
+
+    corsPolicyAssert.equal(
+      await invokeOriginCallback(
+        options,
+        'https://app.example.com',
+      ),
+      true,
+    );
+
+    corsPolicyAssert.equal(
+      await invokeOriginCallback(
+        options,
+        undefined,
+      ),
+      true,
+    );
+
+    corsPolicyAssert.equal(
+      await invokeOriginCallback(
+        options,
+        'https://blocked.example.com',
+      ),
+      false,
+    );
+  },
+);
+
+corsPolicyTest(
+  'runtime app emits CORS header only for allowed origins',
+  async () => {
+    const allowedOrigin = (
+      'http://localhost:3000'
+    );
+
+    const allowedResponse = (
+      await requestRuntimeApp(
+        allowedOrigin,
+      )
+    );
+
+    corsPolicyAssert.equal(
+      allowedResponse.statusCode,
+      200,
+    );
+
+    corsPolicyAssert.equal(
+      allowedResponse.headers[
+        'access-control-allow-origin'
+      ],
+      allowedOrigin,
+    );
+
+    const blockedResponse = (
+      await requestRuntimeApp(
+        'https://blocked.example.com',
+      )
+    );
+
+    corsPolicyAssert.equal(
+      blockedResponse.statusCode,
+      200,
+    );
+
+    corsPolicyAssert.equal(
+      blockedResponse.headers[
+        'access-control-allow-origin'
+      ],
+      undefined,
+    );
+
+    const noOriginResponse = (
+      await requestRuntimeApp()
+    );
+
+    corsPolicyAssert.equal(
+      noOriginResponse.statusCode,
+      200,
+    );
+  },
+);
