@@ -10,7 +10,8 @@
     "test:ai": "node scripts/testAiService.js",
     "test": "node --test test/backend-smoke.test.js",
     "test:smoke": "node --test test/backend-smoke.test.js",
-    "lint": "eslint server.js \"src/**/*.js\" \"test/**/*.js\" --max-warnings=0"
+    "lint": "eslint server.js \"src/**/*.js\" \"test/**/*.js\" --max-warnings=0",
+    "test:e2e:auth-ai": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/testAuthenticatedAiRuntime.ps1"
   },
   "keywords": [
     "mindpulse",
