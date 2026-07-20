@@ -269,16 +269,11 @@ class _JournalScreenState extends State<JournalScreen> {
           if (_favoriteOnly)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
-                  const SizedBox(width: 7),
-                  const Text(
-                    'Showing favourite entries',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const Spacer(),
-                  TextButton(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 330;
+
+                  final showAllButton = TextButton(
                     onPressed: () {
                       setState(() {
                         _favoriteOnly = false;
@@ -287,8 +282,48 @@ class _JournalScreenState extends State<JournalScreen> {
                       _loadJournals();
                     },
                     child: const Text('Show all'),
-                  ),
-                ],
+                  );
+
+                  final statusLabel = Row(
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 7),
+                      const Expanded(
+                        child: Text(
+                          'Showing favourite entries',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  );
+
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        statusLabel,
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: showAllButton,
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(child: statusLabel),
+                      const SizedBox(width: 8),
+                      showAllButton,
+                    ],
+                  );
+                },
               ),
             ),
           if (_errorMessage != null) _buildErrorBanner(),

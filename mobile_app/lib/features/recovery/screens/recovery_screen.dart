@@ -861,11 +861,20 @@ class _RecoveryActivityScreenState extends State<RecoveryActivityScreen> {
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 10),
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 0,
+                    runSpacing: 0,
                     children: List.generate(5, (index) {
                       final value = index + 1;
 
                       return IconButton(
+                        tooltip: 'Rate $value out of 5',
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
                         onPressed: () {
                           setState(() {
                             _rating = value;
@@ -876,7 +885,7 @@ class _RecoveryActivityScreenState extends State<RecoveryActivityScreen> {
                               ? Icons.star_rounded
                               : Icons.star_outline_rounded,
                           color: Colors.amber,
-                          size: 32,
+                          size: 30,
                         ),
                       );
                     }),

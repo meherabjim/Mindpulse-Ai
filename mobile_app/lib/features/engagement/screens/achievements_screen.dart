@@ -579,14 +579,17 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
               ],
             ),
             const SizedBox(height: 14),
-            Row(
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 6,
               children: [
                 Text(
                   '${currentValue.toStringAsFixed(currentValue % 1 == 0 ? 0 : 1)} / '
                   '${targetValue.toStringAsFixed(targetValue % 1 == 0 ? 0 : 1)}',
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                const Spacer(),
                 Text(
                   '+$points points',
                   style: const TextStyle(

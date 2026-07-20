@@ -1268,11 +1268,11 @@ class _HabitEditorScreenState extends State<HabitEditorScreen> {
                   subtitle: Text(
                     _endDate == null ? 'No end date' : _dateString(_endDate!),
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_endDate != null)
-                        IconButton(
+                  trailing: _endDate == null
+                      ? const Icon(Icons.chevron_right_rounded)
+                      : IconButton(
+                          tooltip: 'Clear end date',
+                          visualDensity: VisualDensity.compact,
                           onPressed: () {
                             setState(() {
                               _endDate = null;
@@ -1280,9 +1280,6 @@ class _HabitEditorScreenState extends State<HabitEditorScreen> {
                           },
                           icon: const Icon(Icons.clear_rounded),
                         ),
-                      const Icon(Icons.chevron_right_rounded),
-                    ],
-                  ),
                   onTap: _pickEndDate,
                 ),
               ],
@@ -1771,16 +1768,37 @@ class _HabitDetailsScreenState extends State<HabitDetailsScreen> {
   }
 
   Widget _infoTile(IconData icon, String title, String value) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      trailing: Flexible(
-        child: Text(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 340;
+
+        final valueText = Text(
           value,
-          textAlign: TextAlign.right,
+          maxLines: compact ? 3 : 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: compact ? TextAlign.left : TextAlign.right,
           style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
+        );
+
+        return ListTile(
+          leading: Icon(icon),
+          title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+          subtitle: compact
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: valueText,
+                )
+              : null,
+          trailing: compact
+              ? null
+              : ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.42,
+                  ),
+                  child: valueText,
+                ),
+        );
+      },
     );
   }
 }

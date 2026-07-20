@@ -972,41 +972,60 @@ class _WellnessQuestionnaireScreenState
             ),
           ],
         ),
-        child: Row(
-          children: [
-            if (_currentIndex > 0)
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _submitting ? null : _back,
-                  child: const Text('Back'),
-                ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final useStackedButtons = constraints.maxWidth < 340;
+
+            final backButton = OutlinedButton(
+              onPressed: _submitting ? null : _back,
+              child: const Text('Back'),
+            );
+
+            final continueButton = FilledButton.icon(
+              onPressed: _submitting ? null : _continue,
+              icon: _submitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      _currentIndex == _totalQuestions - 1
+                          ? Icons.health_and_safety
+                          : Icons.arrow_forward_rounded,
+                    ),
+              label: Text(
+                _submitting
+                    ? 'Analysing...'
+                    : _currentIndex == _totalQuestions - 1
+                    ? 'Complete Scan'
+                    : 'Continue',
               ),
-            if (_currentIndex > 0) const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: FilledButton.icon(
-                onPressed: _submitting ? null : _continue,
-                icon: _submitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        _currentIndex == _totalQuestions - 1
-                            ? Icons.health_and_safety
-                            : Icons.arrow_forward_rounded,
-                      ),
-                label: Text(
-                  _submitting
-                      ? 'Analysing...'
-                      : _currentIndex == _totalQuestions - 1
-                      ? 'Complete Scan'
-                      : 'Continue',
-                ),
-              ),
-            ),
-          ],
+            );
+
+            if (_currentIndex == 0) {
+              return SizedBox(width: double.infinity, child: continueButton);
+            }
+
+            if (useStackedButtons) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(width: double.infinity, child: backButton),
+                  const SizedBox(height: 10),
+                  SizedBox(width: double.infinity, child: continueButton),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: backButton),
+                const SizedBox(width: 12),
+                Expanded(flex: 2, child: continueButton),
+              ],
+            );
+          },
         ),
       ),
     );

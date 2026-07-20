@@ -451,6 +451,10 @@ class _SmartReminderCenterScreenState extends State<SmartReminderCenterScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final compactAppBar = MediaQuery.sizeOf(context).width < 420;
+
+    final saveStatus = _saving ? 'Saving...' : 'Auto-saved';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
 
@@ -459,18 +463,23 @@ class _SmartReminderCenterScreenState extends State<SmartReminderCenterScreen> {
 
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: EdgeInsets.only(right: compactAppBar ? 8 : 16),
             child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _saving ? Icons.sync_rounded : Icons.cloud_done_outlined,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(_saving ? 'Saving...' : 'Auto-saved'),
-                ],
+              child: Tooltip(
+                message: saveStatus,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _saving ? Icons.sync_rounded : Icons.cloud_done_outlined,
+                      size: 18,
+                    ),
+                    if (!compactAppBar) ...[
+                      const SizedBox(width: 6),
+                      Text(saveStatus),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),

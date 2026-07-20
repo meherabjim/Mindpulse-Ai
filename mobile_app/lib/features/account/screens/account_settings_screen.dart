@@ -698,12 +698,22 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               granted ? Icons.check_circle_rounded : Icons.cancel_outlined,
               color: granted ? Colors.green : Colors.grey,
             ),
-            title: Text(entry.value),
-            trailing: Text(
-              granted ? 'Granted' : 'Not granted',
-              style: TextStyle(
-                color: granted ? Colors.green.shade700 : Colors.grey.shade700,
-                fontWeight: FontWeight.w700,
+            title: Text(
+              entry.value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 96),
+              child: Text(
+                granted ? 'Granted' : 'Not granted',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: granted ? Colors.green.shade700 : Colors.grey.shade700,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           );
@@ -724,14 +734,19 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(icon, color: const Color(0xFF6059E8)),
                 const SizedBox(width: 9),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ],

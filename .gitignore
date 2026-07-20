@@ -65,6 +65,10 @@ logs/
 **/logs/
 reports/
 **/reports/
+
+# Keep active Flutter report feature source under version control.
+!mobile_app/lib/features/reports/
+!mobile_app/lib/features/reports/**
 *.log
 *.tmp
 temp/
