@@ -1053,7 +1053,15 @@ class _HabitEditorScreenState extends State<HabitEditorScreen> {
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
-            child: Text(_saving ? 'Saving...' : 'Save'),
+            child: Tooltip(
+              message: _saving ? 'Saving...' : 'Save',
+              child: MediaQuery.sizeOf(context).width < 420
+                  ? Icon(
+                      _saving ? Icons.sync_rounded : Icons.save_outlined,
+                      semanticLabel: _saving ? 'Saving' : 'Save',
+                    )
+                  : Text(_saving ? 'Saving...' : 'Save'),
+            ),
           ),
         ],
       ),
