@@ -1187,3 +1187,197 @@ textarea {
     padding: 1.5rem;
   }
 }
+/* BEGIN MINDPULSE TABLE LOGOUT FIX V4 */
+
+/* Keep navigation scrollable and logout always visible. */
+
+.sidebar {
+  overflow: hidden;
+}
+
+.navigation {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color:
+    rgba(94, 211, 195, 0.35)
+    transparent;
+}
+
+.navigation::-webkit-scrollbar {
+  width: 5px;
+}
+
+.navigation::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(94, 211, 195, 0.35);
+}
+
+.sidebar-footer {
+  flex: 0 0 auto;
+  margin-top: 0.8rem;
+  border-top:
+    1px solid
+    rgba(255, 255, 255, 0.08);
+  padding-top: 1rem;
+  background: var(--sidebar);
+}
+
+.topbar-logout-button {
+  border: 1px solid rgba(255, 107, 98, 0.25);
+  background: var(--danger-soft);
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.topbar-logout-button:hover {
+  border-color: rgba(255, 107, 98, 0.42);
+  background: var(--danger);
+  color: #ffffff;
+}
+
+/* Cleaner search toolbar. */
+
+.list-toolbar {
+  grid-template-columns:
+    minmax(280px, 440px)
+    140px;
+  justify-content: start;
+  align-items: center;
+}
+
+.list-toolbar button {
+  width: 140px;
+  min-height: 44px;
+}
+
+/* Readable data tables. */
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 960px;
+  table-layout: auto;
+}
+
+.data-table th {
+  min-width: 90px;
+  max-width: 220px;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.data-table td {
+  min-width: 110px;
+  max-width: 280px;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.45;
+}
+
+.data-table td.readable-id {
+  width: 64px;
+  min-width: 64px;
+  max-width: 72px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.data-table td.readable-email {
+  min-width: 205px;
+  max-width: 240px;
+  overflow-wrap: anywhere;
+}
+
+.data-table td.readable-date {
+  min-width: 175px;
+  max-width: 190px;
+  white-space: nowrap;
+}
+
+.data-table td.readable-wide {
+  min-width: 220px;
+  max-width: 340px;
+}
+
+.table-badge {
+  display: inline-flex;
+  min-width: 62px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.34rem 0.62rem;
+  font-size: 0.71rem;
+  font-weight: 820;
+  line-height: 1;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.table-badge-success {
+  border-color: rgba(36, 189, 147, 0.26);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.table-badge-warning {
+  border-color: rgba(205, 144, 26, 0.3);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.table-badge-danger {
+  border-color: rgba(211, 74, 65, 0.3);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.table-badge-neutral {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-soft);
+}
+
+@media (max-width: 850px) {
+  .navigation {
+    flex: initial;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .sidebar-footer {
+    background: transparent;
+  }
+}
+
+@media (max-width: 650px) {
+  .list-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .list-toolbar button {
+    width: 100%;
+  }
+
+  .topbar-logout-button {
+    flex: 1;
+  }
+
+  .data-table {
+    min-width: 880px;
+  }
+}
+
+/* END MINDPULSE TABLE LOGOUT FIX V4 */
