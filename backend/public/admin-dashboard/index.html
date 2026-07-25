@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="
+      default-src 'self';
+      connect-src 'self';
+      img-src 'self' data:;
+      style-src 'self';
+      script-src 'self';
+      object-src 'none';
+      base-uri 'self';
+      frame-ancestors 'none';
+      form-action 'self'
+    "
+  >
+  <meta
+    name="description"
+    content="MindPulse AI administration dashboard"
+  >
+  <title>MindPulse Admin</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+
+<body>
+  <main id="login-view" class="auth-shell">
+    <section class="login-card">
+      <div class="brand brand-large">
+        <div class="brand-mark">M</div>
+
+        <div>
+          <p class="eyebrow">Secure administration</p>
+          <h1>MindPulse Admin</h1>
+        </div>
+      </div>
+
+      <p class="login-copy">
+        Sign in with an authorized MindPulse administrator account.
+      </p>
+
+      <form id="login-form" class="form-stack">
+        <label>
+          <span>Email address</span>
+
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autocomplete="username"
+            required
+          >
+        </label>
+
+        <label>
+          <span>Password</span>
+
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          >
+        </label>
+
+        <button id="login-button" type="submit">
+          Sign in securely
+        </button>
+      </form>
+
+      <p id="login-message" class="form-message" role="alert"></p>
+
+      <p class="security-note">
+        Access tokens are kept only in this browser tab.
+      </p>
+    </section>
+  </main>
+
+  <div id="app-view" class="app-shell is-hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">M</div>
+
+        <div>
+          <strong>MindPulse</strong>
+          <span>Admin Console</span>
+        </div>
+      </div>
+
+      <nav id="navigation" class="navigation">
+        <button
+          type="button"
+          class="nav-item is-active"
+          data-view="overview"
+        >
+          Overview
+        </button>
+
+        <button type="button" class="nav-item" data-view="users">
+          Users
+        </button>
+
+        <button type="button" class="nav-item" data-view="safety">
+          Safety &amp; Risks
+        </button>
+
+        <button type="button" class="nav-item" data-view="reports">
+          Reports
+        </button>
+
+        <button type="button" class="nav-item" data-view="contents">
+          App Content
+        </button>
+
+        <button type="button" class="nav-item" data-view="support">
+          Support Resources
+        </button>
+
+        <button type="button" class="nav-item" data-view="audit">
+          Audit Logs
+        </button>
+
+        <button type="button" class="nav-item" data-view="system">
+          System Logs
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span id="admin-role">Administrator</span>
+
+        <button
+          id="logout-button"
+          type="button"
+          class="button-secondary button-full"
+        >
+          Sign out
+        </button>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">MindPulse AI operations</p>
+          <h1 id="page-title">Overview</h1>
+          <p id="page-subtitle" class="page-subtitle">
+            Platform health and wellness activity
+          </p>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="admin-identity">
+            <strong id="admin-name">Administrator</strong>
+            <span id="admin-email"></span>
+          </div>
+
+          <button
+            id="refresh-button"
+            type="button"
+            class="button-secondary"
+          >
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <div
+        id="status-banner"
+        class="status-banner is-hidden"
+        role="status"
+      ></div>
+
+      <section id="page-actions" class="page-actions"></section>
+
+      <section id="content" class="content-area">
+        <div class="loading-card">
+          Loading administrator dashboard…
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <dialog id="action-dialog" class="action-dialog">
+    <form id="action-form" method="dialog">
+      <header class="dialog-header">
+        <div>
+          <p class="eyebrow">Administrative action</p>
+          <h2 id="dialog-title">Action</h2>
+        </div>
+
+        <button
+          id="dialog-close"
+          type="button"
+          class="icon-button"
+          aria-label="Close dialog"
+        >
+          ×
+        </button>
+      </header>
+
+      <p id="dialog-description" class="dialog-description"></p>
+
+      <label class="json-field">
+        <span>Request JSON</span>
+
+        <textarea
+          id="dialog-json"
+          rows="16"
+          spellcheck="false"
+        ></textarea>
+      </label>
+
+      <pre id="dialog-output" class="dialog-output is-hidden"></pre>
+
+      <footer class="dialog-footer">
+        <button
+          id="dialog-cancel"
+          type="button"
+          class="button-secondary"
+        >
+          Cancel
+        </button>
+
+        <button id="dialog-submit" type="submit">
+          Submit
+        </button>
+      </footer>
+    </form>
+  </dialog>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>

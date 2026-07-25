@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const { buildCorsOptions } = require('./config/cors');
 const helmet = require('helmet');
@@ -150,6 +150,27 @@ app.use('/api/v1', recommendationSessionRoutes);
 app.use('/api/v1', reportPdfRoutes);
 
 
+
+// BEGIN MINDPULSE ADMIN DASHBOARD FRONTEND
+const adminDashboardDirectory = require('path').join(
+  __dirname,
+  '..',
+  'public',
+  'admin-dashboard'
+);
+
+app.use(
+  '/admin-dashboard',
+  express.static(adminDashboardDirectory, {
+    etag: true,
+    index: 'index.html',
+    maxAge:
+      process.env.NODE_ENV === 'production'
+        ? '1h'
+        : 0
+  })
+);
+// END MINDPULSE ADMIN DASHBOARD FRONTEND
 app.use((req, res, next) => {
     return next(
         new AppError(
