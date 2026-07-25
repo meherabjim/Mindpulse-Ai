@@ -1381,3 +1381,19 @@ textarea {
 }
 
 /* END MINDPULSE TABLE LOGOUT FIX V4 */
+/* BEGIN HIDE DUPLICATE SIDEBAR LOGOUT */
+
+/*
+  The hidden button remains in the DOM because the topbar
+  Sign out button uses the existing secure logout handler.
+*/
+
+.sidebar-footer #logout-button {
+  display: none !important;
+}
+
+.sidebar-footer {
+  padding-bottom: 0.35rem;
+}
+
+/* END HIDE DUPLICATE SIDEBAR LOGOUT */
