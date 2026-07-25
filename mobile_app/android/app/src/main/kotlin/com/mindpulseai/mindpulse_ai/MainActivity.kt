@@ -1,6 +1,7 @@
 package com.mindpulseai.mindpulse_ai
 
 import android.Manifest
+import android.app.AlarmManager
 import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
@@ -11,6 +12,7 @@ import android.os.Process
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.mindpulseai.mindpulse_ai.prayer.PrayerAlarmScheduler
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -38,6 +40,75 @@ class MainActivity : FlutterActivity() {
         SmartReminderPlugin.register(this, flutterEngine)
 
         MovementInsightPlugin.register(this, flutterEngine)
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "mindpulse/prayer_alarm"
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getStatus" -> {
+                    result.success(
+                        mapOf(
+                            "notificationPermission" to
+                                hasNotificationPermission(),
+                            "exactAlarmPermission" to
+                                PrayerAlarmScheduler
+                                    .canScheduleExact(this)
+                        )
+                    )
+                }
+
+                "requestNotificationPermission" -> {
+                    requestPrayerNotificationPermission()
+                    result.success(null)
+                }
+
+                "requestExactAlarmPermission" -> {
+                    requestExactAlarmPermission()
+                    result.success(null)
+                }
+
+                "scheduleAlarms" -> {
+                    val json =
+                        call.argument<String>("json")
+
+                    if (json.isNullOrBlank()) {
+                        result.error(
+                            "invalid_schedule",
+                            "Prayer schedule JSON is missing.",
+                            null
+                        )
+                    } else {
+                        result.success(
+                            PrayerAlarmScheduler.scheduleAll(
+                                this,
+                                json
+                            )
+                        )
+                    }
+                }
+
+                "cancelAll" -> {
+                    PrayerAlarmScheduler.cancelAll(this)
+                    result.success(null)
+                }
+
+                "testAlarm" -> {
+                    val fajr =
+                        call.argument<Boolean>("fajr")
+                            ?: false
+
+                    PrayerAlarmScheduler.scheduleTest(
+                        this,
+                        fajr
+                    )
+
+                    result.success(null)
+                }
+
+                else -> result.notImplemented()
+            }
+        }
 
         MethodChannel(
             flutterEngine
@@ -278,6 +349,52 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun requestPrayerNotificationPermission() {
+        if (
+            Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.TIRAMISU &&
+            !hasNotificationPermission()
+        ) {
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.POST_NOTIFICATIONS
+                ),
+                9401
+            )
+        }
+    }
+
+    private fun requestExactAlarmPermission() {
+        if (
+            Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.S
+        ) {
+            return
+        }
+
+        val alarmManager =
+            getSystemService(
+                AlarmManager::class.java
+            )
+
+        if (
+            alarmManager
+                .canScheduleExactAlarms()
+        ) {
+            return
+        }
+
+        startActivity(
+            Intent(
+                Settings
+                    .ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                Uri.parse(
+                    "package:$packageName"
+                )
+            )
+        )
     }
 
     private fun hasNotificationPermission():

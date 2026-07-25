@@ -6,6 +6,7 @@ import '../../safety/screens/emergency_support_screen.dart';
 
 import '../../checkin/screens/daily_checkin_screen.dart';
 import '../../wellness/screens/wellness_scan_screen.dart';
+import '../../wellness/services/wellness_scan_service.dart';
 import '../../journal/screens/journal_screen.dart';
 import '../../habit/screens/habit_screen.dart';
 import '../../engagement/screens/notifications_screen.dart';
@@ -18,6 +19,7 @@ import '../../ai/screens/ai_wellness_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 import '../../digital_wellbeing/screens/mindful_screen_time_screen.dart';
 import '../../reminders/screens/smart_reminder_center_screen.dart';
+import '../../prayer/screens/prayer_settings_screen.dart';
 
 class MainDashboardScreen extends StatefulWidget {
   const MainDashboardScreen({super.key});
@@ -46,6 +48,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
         },
       ),
       const AiWellnessScreen(),
+      const PrayerSettingsScreen(),
       const ProfileScreen(),
     ];
   }
@@ -100,6 +103,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             label: 'AI Wellness',
           ),
           NavigationDestination(
+            icon: Icon(Icons.mosque_outlined),
+            selectedIcon: Icon(Icons.mosque_rounded),
+            label: 'Prayer',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),
             selectedIcon: Icon(Icons.person_rounded),
             label: 'Profile',
@@ -110,10 +118,61 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   }
 }
 
-class DashboardHomeTab extends StatelessWidget {
+class DashboardHomeTab extends StatefulWidget {
   const DashboardHomeTab({required this.onOpenAiWellness, super.key});
 
   final VoidCallback onOpenAiWellness;
+
+  @override
+  State<DashboardHomeTab> createState() => _DashboardHomeTabState();
+}
+
+class _DashboardHomeTabState extends State<DashboardHomeTab> {
+  final WellnessScanService _wellnessService = WellnessScanService();
+
+  double? _wellnessScore;
+  String? _riskLevel;
+  bool _wellnessLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWellness();
+  }
+
+  Future<void> _loadWellness() async {
+    try {
+      final scan = await _wellnessService.getLatestScan();
+
+      if (!mounted) {
+        return;
+      }
+
+      final rawScore = scan?['total_score'];
+
+      final score = rawScore is num
+          ? rawScore.toDouble()
+          : double.tryParse(rawScore?.toString() ?? '');
+
+      setState(() {
+        _wellnessScore = score;
+        _riskLevel = scan?['risk_level']?.toString();
+        _wellnessLoading = false;
+      });
+    } catch (error) {
+      debugPrint(
+        'MindPulse: Dashboard wellness refresh failed: $error',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _wellnessLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -195,6 +254,24 @@ class DashboardHomeTab extends StatelessWidget {
   }
 
   Widget _buildWellnessOverview(BuildContext context) {
+    final score = (_wellnessScore ?? 0.0)
+        .clamp(0.0, 100.0)
+        .toDouble();
+
+    final storedRisk = _riskLevel?.trim() ?? '';
+
+    final riskLabel = storedRisk.isNotEmpty
+        ? storedRisk.toUpperCase()
+        : _wellnessLoading
+        ? 'LOADING'
+        : 'NO DATA';
+
+    final description = _wellnessLoading
+        ? 'Refreshing your latest wellness result...'
+        : _wellnessScore == null
+        ? 'Complete a Wellness Scan to see your current score.'
+        : 'This score is based on your latest completed Wellness Scan.';
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -230,10 +307,8 @@ class DashboardHomeTab extends StatelessWidget {
               Icon(Icons.favorite_rounded, color: Colors.white),
             ],
           ),
-
           const SizedBox(height: 18),
-
-          const Wrap(
+          Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.end,
             spacing: 12,
@@ -244,16 +319,16 @@ class DashboardHomeTab extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '38.5',
-                    style: TextStyle(
+                    score.toStringAsFixed(1),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 42,
                       fontWeight: FontWeight.w900,
                       height: 1,
                     ),
                   ),
-                  SizedBox(width: 4),
-                  Padding(
+                  const SizedBox(width: 4),
+                  const Padding(
                     padding: EdgeInsets.only(bottom: 5),
                     child: Text(
                       '/ 100',
@@ -266,29 +341,29 @@ class DashboardHomeTab extends StatelessWidget {
                   ),
                 ],
               ),
-              _RiskBadge(),
+              _RiskBadge(label: riskLabel),
             ],
           ),
-
           const SizedBox(height: 18),
-
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: const LinearProgressIndicator(
-              value: 0.385,
+            child: LinearProgressIndicator(
+              value: score / 100,
               minHeight: 10,
-              backgroundColor: Color(0x44FFFFFF),
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              backgroundColor: const Color(0x44FFFFFF),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(
+                    Colors.white,
+                  ),
             ),
           ),
-
           const SizedBox(height: 13),
-
-          const Text(
-            'Your AI wellness plan is ready. '
-            'Review the personalized actions created '
-            'from your latest wellbeing data.',
-            style: TextStyle(color: Color(0xFFEDEBFF), height: 1.45),
+          Text(
+            description,
+            style: const TextStyle(
+              color: Color(0xFFEDEBFF),
+              height: 1.45,
+            ),
           ),
         ],
       ),
@@ -300,7 +375,7 @@ class DashboardHomeTab extends StatelessWidget {
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(26),
       child: InkWell(
-        onTap: onOpenAiWellness,
+        onTap: widget.onOpenAiWellness,
         borderRadius: BorderRadius.circular(26),
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -425,6 +500,7 @@ class DashboardHomeTab extends StatelessWidget {
         title: 'Smart Reminders',
         subtitle: 'Gentle wellness reminders',
       ),
+
     ];
 
     return GridView.builder(
@@ -447,15 +523,19 @@ class DashboardHomeTab extends StatelessWidget {
           child: InkWell(
             key: ValueKey<String>('wellness-tool-${tool.title}'),
             borderRadius: BorderRadius.circular(26),
-            onTap: () {
+            onTap: () async {
               debugPrint('MindPulse: Tool tapped: ${tool.title}');
 
               if (tool.title == 'Wellness Scan') {
-                Navigator.of(context).push(
+                await Navigator.of(context).push<void>(
                   MaterialPageRoute<void>(
                     builder: (_) => const WellnessScanScreen(),
                   ),
                 );
+
+                if (mounted) {
+                  await _loadWellness();
+                }
 
                 return;
               }
@@ -468,6 +548,7 @@ class DashboardHomeTab extends StatelessWidget {
 
                 return;
               }
+
 
               if (tool.title == 'Mindful Screen Time') {
                 Navigator.of(context).push(
@@ -745,7 +826,9 @@ class _NotificationBellState extends State<_NotificationBell> {
 }
 
 class _RiskBadge extends StatelessWidget {
-  const _RiskBadge();
+  const _RiskBadge({required this.label});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -756,9 +839,9 @@ class _RiskBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(30),
         border: Border.all(color: const Color(0x55FFFFFF)),
       ),
-      child: const Text(
-        'MILD',
-        style: TextStyle(
+      child: Text(
+        label,
+        style: const TextStyle(
           color: Colors.white,
           fontSize: 12,
           fontWeight: FontWeight.w800,
