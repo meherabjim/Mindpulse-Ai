@@ -154,3 +154,5 @@ dataset_*_audit.txt
 **/*.before_*.kt
 **/*.before_*.ps1
 # END MINDPULSE LOCAL BACKUPS
+# Admin Factory Reset backups
+backend/backups/admin-resets/

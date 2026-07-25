@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 
 const adminDashboardController =
     require('../controllers/adminDashboard.controller');
@@ -10,6 +10,10 @@ const {
 
 const router = express.Router();
 
+const {
+  previewFactoryReset,
+  executeFactoryReset
+} = require('../controllers/adminFactoryReset.controller');
 router.use('/admin', authenticateAdmin);
 
 router.get(
@@ -136,4 +140,20 @@ router.get(
         .listSystemLogs
 );
 
+
+// BEGIN ADMIN FACTORY RESET ROUTES
+
+router.get(
+  '/admin/maintenance/factory-reset/preview',
+  authorizeAdminRoles('super_admin'),
+  previewFactoryReset
+);
+
+router.post(
+  '/admin/maintenance/factory-reset',
+  authorizeAdminRoles('super_admin'),
+  executeFactoryReset
+);
+
+// END ADMIN FACTORY RESET ROUTES
 module.exports = router;

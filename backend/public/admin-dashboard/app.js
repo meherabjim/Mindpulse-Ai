@@ -2263,3 +2263,867 @@ if (state.accessToken) {
   enhanceDashboardTables();
 })();
 // END MINDPULSE TABLE READABILITY V4
+// BEGIN MINDPULSE FACTORY RESET UI
+(() => {
+  "use strict";
+
+  const previewEndpoint =
+    "/api/v1/admin/maintenance/factory-reset/preview";
+
+  const resetEndpoint =
+    "/api/v1/admin/maintenance/factory-reset";
+
+  let currentPreview = null;
+
+  function collectTokens(
+    value,
+    keyName,
+    results,
+    depth = 0
+  ) {
+    if (
+      depth > 5 ||
+      value === null ||
+      value === undefined
+    ) {
+      return;
+    }
+
+    if (typeof value === "string") {
+      const key =
+        String(keyName || "")
+          .toLowerCase();
+
+      let score = 0;
+
+      if (key.includes("access")) {
+        score += 100;
+      }
+
+      if (key.includes("admin")) {
+        score += 30;
+      }
+
+      if (key.includes("token")) {
+        score += 20;
+      }
+
+      if (key.includes("refresh")) {
+        score -= 200;
+      }
+
+      if (value.split(".").length === 3) {
+        score += 40;
+      }
+
+      if (
+        score > 0 &&
+        value.length >= 20
+      ) {
+        results.push({
+          token: value,
+          score
+        });
+      }
+
+      try {
+        collectTokens(
+          JSON.parse(value),
+          keyName,
+          results,
+          depth + 1
+        );
+      } catch {
+        // Not JSON.
+      }
+
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        collectTokens(
+          item,
+          `${keyName}.${index}`,
+          results,
+          depth + 1
+        );
+      });
+
+      return;
+    }
+
+    if (typeof value === "object") {
+      Object.entries(value).forEach(
+        ([key, child]) => {
+          collectTokens(
+            child,
+            key,
+            results,
+            depth + 1
+          );
+        }
+      );
+    }
+  }
+
+  function accessToken() {
+    const candidates = [];
+
+    [localStorage, sessionStorage]
+      .forEach((storage) => {
+        for (
+          let index = 0;
+          index < storage.length;
+          index += 1
+        ) {
+          const key =
+            storage.key(index);
+
+          if (!key) {
+            continue;
+          }
+
+          collectTokens(
+            storage.getItem(key),
+            key,
+            candidates
+          );
+        }
+      });
+
+    candidates.sort(
+      (left, right) =>
+        right.score - left.score
+    );
+
+    return candidates[0]?.token || "";
+  }
+
+  async function factoryRequest(
+    method,
+    endpoint,
+    body
+  ) {
+    const token =
+      accessToken();
+
+    if (!token) {
+      throw new Error(
+        "Admin session was not found. Sign in again."
+      );
+    }
+
+    const response =
+      await fetch(
+        endpoint,
+        {
+          method,
+
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${token}`
+          },
+
+          body:
+            body === undefined
+              ? undefined
+              : JSON.stringify(body)
+        }
+      );
+
+    const payload =
+      await response
+        .json()
+        .catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.message ||
+        `Request failed with status ${response.status}.`
+      );
+    }
+
+    return payload?.data || {};
+  }
+
+  function number(value) {
+    return new Intl.NumberFormat().format(
+      Number(value || 0)
+    );
+  }
+
+  function setStatus(
+    message,
+    type = "neutral"
+  ) {
+    const element =
+      document.querySelector(
+        "#factory-reset-status"
+      );
+
+    if (!element) {
+      return;
+    }
+
+    element.className =
+      `factory-reset-status factory-reset-status-${type}`;
+
+    element.textContent = message;
+  }
+
+  function createTableRow(item) {
+    const row =
+      document.createElement("div");
+
+    row.className =
+      "factory-table-row";
+
+    const name =
+      document.createElement("span");
+
+    name.textContent =
+      String(item.table || "");
+
+    const count =
+      document.createElement("strong");
+
+    count.textContent =
+      number(item.rows);
+
+    row.append(name, count);
+
+    return row;
+  }
+
+  function renderPreview(preview) {
+    currentPreview = preview;
+
+    const total =
+      document.querySelector(
+        "#factory-total-rows"
+      );
+
+    const resetList =
+      document.querySelector(
+        "#factory-reset-tables"
+      );
+
+    const protectedList =
+      document.querySelector(
+        "#factory-protected-tables"
+      );
+
+    const resetButton =
+      document.querySelector(
+        "#factory-open-dialog"
+      );
+
+    if (
+      !total ||
+      !resetList ||
+      !protectedList ||
+      !resetButton
+    ) {
+      return;
+    }
+
+    total.textContent =
+      number(preview.totalRows);
+
+    resetList.replaceChildren();
+
+    (preview.resetTables || [])
+      .forEach((item) => {
+        resetList.append(
+          createTableRow(item)
+        );
+      });
+
+    protectedList.replaceChildren();
+
+    (preview.preservedTables || [])
+      .forEach((item) => {
+        protectedList.append(
+          createTableRow(item)
+        );
+      });
+
+    resetButton.disabled = false;
+
+    setStatus(
+      "Preview completed. Review the table list before resetting.",
+      "success"
+    );
+  }
+
+  async function loadPreview() {
+    const button =
+      document.querySelector(
+        "#factory-preview-button"
+      );
+
+    if (button) {
+      button.disabled = true;
+      button.textContent =
+        "Loading preview...";
+    }
+
+    setStatus(
+      "Checking all MindPulse database tables...",
+      "neutral"
+    );
+
+    try {
+      const preview =
+        await factoryRequest(
+          "GET",
+          previewEndpoint
+        );
+
+      renderPreview(preview);
+    } catch (error) {
+      setStatus(
+        error.message,
+        "danger"
+      );
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent =
+          "Refresh preview";
+      }
+    }
+  }
+
+  function openDialog() {
+    if (!currentPreview) {
+      setStatus(
+        "Generate the Factory Reset preview first.",
+        "warning"
+      );
+
+      return;
+    }
+
+    const dialog =
+      document.querySelector(
+        "#factory-reset-dialog"
+      );
+
+    const requiredPhrase =
+      document.querySelector(
+        "#factory-required-phrase"
+      );
+
+    const password =
+      document.querySelector(
+        "#factory-admin-password"
+      );
+
+    const phrase =
+      document.querySelector(
+        "#factory-confirmation-phrase"
+      );
+
+    const output =
+      document.querySelector(
+        "#factory-dialog-output"
+      );
+
+    requiredPhrase.textContent =
+      currentPreview.confirmationPhrase;
+
+    password.value = "";
+    phrase.value = "";
+
+    output.hidden = true;
+    output.textContent = "";
+
+    dialog.showModal();
+    password.focus();
+  }
+
+  async function submitReset(event) {
+    event.preventDefault();
+
+    const password =
+      document.querySelector(
+        "#factory-admin-password"
+      )?.value || "";
+
+    const confirmationPhrase =
+      document.querySelector(
+        "#factory-confirmation-phrase"
+      )?.value.trim() || "";
+
+    const required =
+      currentPreview
+        ?.confirmationPhrase || "";
+
+    const submitButton =
+      document.querySelector(
+        "#factory-confirm-reset"
+      );
+
+    const output =
+      document.querySelector(
+        "#factory-dialog-output"
+      );
+
+    if (!password) {
+      output.hidden = false;
+      output.textContent =
+        "Enter the Super Admin password.";
+
+      return;
+    }
+
+    if (confirmationPhrase !== required) {
+      output.hidden = false;
+      output.textContent =
+        "The confirmation phrase is incorrect.";
+
+      return;
+    }
+
+    submitButton.disabled = true;
+    submitButton.textContent =
+      "Backing up and resetting...";
+
+    output.hidden = false;
+    output.textContent =
+      "Creating the full SQL backup. Do not close this page.";
+
+    try {
+      const result =
+        await factoryRequest(
+          "POST",
+          resetEndpoint,
+          {
+            password,
+            confirmationPhrase
+          }
+        );
+
+      output.textContent =
+        [
+          "FACTORY RESET COMPLETED",
+          "",
+          `Deleted rows: ${number(result.deletedRows)}`,
+          `SQL backup: ${result.backupFile}`,
+          `Reset receipt: ${result.receiptFile || "Not created"}`,
+          "",
+          "Super Admin account and information were preserved.",
+          "All user sessions were revoked."
+        ].join("\n");
+
+      setStatus(
+        "Factory Reset completed. All resettable data is now zero.",
+        "success"
+      );
+
+      window.setTimeout(
+        () => {
+          document
+            .querySelector("#logout-button")
+            ?.click();
+        },
+        5000
+      );
+    } catch (error) {
+      output.textContent =
+        error.message;
+
+      submitButton.disabled = false;
+      submitButton.textContent =
+        "Run Factory Reset";
+    }
+  }
+
+  function renderFactoryResetPage() {
+    document
+      .querySelectorAll(".nav-item")
+      .forEach((item) => {
+        item.classList.remove("is-active");
+      });
+
+    document
+      .querySelector(
+        '[data-view="factory-reset"]'
+      )
+      ?.classList.add("is-active");
+
+    const title =
+      document.querySelector(
+        "#page-title"
+      );
+
+    const subtitle =
+      document.querySelector(
+        ".page-subtitle"
+      );
+
+    const actions =
+      document.querySelector(
+        "#page-actions"
+      );
+
+    const content =
+      document.querySelector(
+        "#content"
+      );
+
+    if (title) {
+      title.textContent =
+        "Factory Reset";
+    }
+
+    if (subtitle) {
+      subtitle.textContent =
+        "Reset all MindPulse data except protected Admin information";
+    }
+
+    actions?.replaceChildren();
+
+    if (!content) {
+      return;
+    }
+
+    content.innerHTML = `
+      <section class="factory-reset-hero">
+        <div>
+          <span class="factory-kicker">
+            Super Admin only
+          </span>
+
+          <h2>Reset everything to zero</h2>
+
+          <p>
+            All users, wellness activity, reports, AI data,
+            journals, habits, notifications, logs and sessions
+            will be cleared. Super Admin information and required
+            application reference data will remain.
+          </p>
+        </div>
+
+        <div class="factory-protection">
+          SQL backup required
+        </div>
+      </section>
+
+      <div
+        id="factory-reset-status"
+        class="factory-reset-status factory-reset-status-neutral"
+      >
+        Generate a preview before running Factory Reset.
+      </div>
+
+      <section class="factory-summary-grid">
+        <article class="factory-summary-card">
+          <span>Rows that will become zero</span>
+
+          <strong id="factory-total-rows">
+            —
+          </strong>
+
+          <button
+            id="factory-preview-button"
+            type="button"
+          >
+            Generate Factory Reset preview
+          </button>
+        </article>
+
+        <article class="factory-summary-card factory-safe-card">
+          <span>Super Admin information</span>
+
+          <strong>Protected</strong>
+
+          <p>
+            Admin account, email, password and role
+            cannot be removed by Factory Reset.
+          </p>
+        </article>
+      </section>
+
+      <section class="factory-columns">
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Tables that will become zero</h2>
+          </div>
+
+          <div
+            id="factory-reset-tables"
+            class="factory-table-list"
+          >
+            <p class="factory-empty">
+              Preview has not been generated.
+            </p>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Protected tables</h2>
+          </div>
+
+          <div
+            id="factory-protected-tables"
+            class="factory-table-list"
+          >
+            <p class="factory-empty">
+              Preview has not been generated.
+            </p>
+          </div>
+        </article>
+      </section>
+
+      <section class="factory-danger-zone">
+        <div>
+          <span class="factory-kicker">
+            Danger zone
+          </span>
+
+          <h2>Factory Reset MindPulse</h2>
+
+          <p>
+            A complete SQL backup must succeed before any data
+            is removed. Super Admin password and exact typed
+            confirmation are required.
+          </p>
+        </div>
+
+        <button
+          id="factory-open-dialog"
+          type="button"
+          class="factory-danger-button"
+          disabled
+        >
+          Factory Reset
+        </button>
+      </section>
+
+      <dialog
+        id="factory-reset-dialog"
+        class="action-dialog"
+      >
+        <form id="factory-reset-form">
+          <div class="dialog-header">
+            <div>
+              <span class="factory-kicker">
+                Final confirmation
+              </span>
+
+              <h2>Reset all MindPulse data?</h2>
+            </div>
+
+            <button
+              id="factory-close-dialog"
+              type="button"
+              class="icon-button"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+
+          <p class="dialog-description">
+            All resettable database tables will become zero.
+            Your Super Admin information will remain unchanged.
+          </p>
+
+          <label>
+            Super Admin password
+
+            <input
+              id="factory-admin-password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+
+          <label>
+            Type this phrase exactly
+
+            <code id="factory-required-phrase"></code>
+
+            <input
+              id="factory-confirmation-phrase"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              required
+            />
+          </label>
+
+          <pre
+            id="factory-dialog-output"
+            class="dialog-output"
+            hidden
+          ></pre>
+
+          <div class="dialog-footer">
+            <button
+              id="factory-cancel-reset"
+              type="button"
+              class="button-secondary"
+            >
+              Cancel
+            </button>
+
+            <button
+              id="factory-confirm-reset"
+              type="submit"
+              class="factory-danger-button"
+            >
+              Run Factory Reset
+            </button>
+          </div>
+        </form>
+      </dialog>
+    `;
+
+    document
+      .querySelector(
+        "#factory-preview-button"
+      )
+      ?.addEventListener(
+        "click",
+        loadPreview
+      );
+
+    document
+      .querySelector(
+        "#factory-open-dialog"
+      )
+      ?.addEventListener(
+        "click",
+        openDialog
+      );
+
+    document
+      .querySelector(
+        "#factory-reset-form"
+      )
+      ?.addEventListener(
+        "submit",
+        submitReset
+      );
+
+    const closeDialog = () => {
+      document
+        .querySelector(
+          "#factory-reset-dialog"
+        )
+        ?.close();
+    };
+
+    document
+      .querySelector(
+        "#factory-close-dialog"
+      )
+      ?.addEventListener(
+        "click",
+        closeDialog
+      );
+
+    document
+      .querySelector(
+        "#factory-cancel-reset"
+      )
+      ?.addEventListener(
+        "click",
+        closeDialog
+      );
+
+    loadPreview();
+  }
+
+  function injectNavigation() {
+    if (
+      document.querySelector(
+        '[data-view="factory-reset"]'
+      )
+    ) {
+      return;
+    }
+
+    const navigation =
+      document.querySelector(
+        ".navigation"
+      );
+
+    if (!navigation) {
+      return;
+    }
+
+    const button =
+      document.createElement("button");
+
+    button.type = "button";
+    button.className = "nav-item";
+    button.dataset.view = "factory-reset";
+    button.textContent = "Factory Reset";
+
+    button.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        renderFactoryResetPage();
+      }
+    );
+
+    const auditButton =
+      navigation.querySelector(
+        '[data-view="audit"]'
+      );
+
+    if (auditButton) {
+      navigation.insertBefore(
+        button,
+        auditButton
+      );
+    } else {
+      navigation.append(button);
+    }
+  }
+
+  function initializeFactoryReset() {
+    injectNavigation();
+
+    const observer =
+      new MutationObserver(() => {
+        injectNavigation();
+      });
+
+    observer.observe(
+      document.body,
+      {
+        childList: true,
+        subtree: true
+      }
+    );
+  }
+
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+    document.addEventListener(
+      "DOMContentLoaded",
+      initializeFactoryReset,
+      {
+        once: true
+      }
+    );
+  } else {
+    initializeFactoryReset();
+  }
+})();
+// END MINDPULSE FACTORY RESET UI
