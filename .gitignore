@@ -145,3 +145,12 @@ Thumbs.db
 dataset_*_audit.txt
 **/dataset_*_audit.txt
 # END MINDPULSE LOCAL DATASET AUDITS
+
+# BEGIN MINDPULSE LOCAL BACKUPS
+/backups/
+**/*.bak
+**/*.backup
+**/*.before_*.dart
+**/*.before_*.kt
+**/*.before_*.ps1
+# END MINDPULSE LOCAL BACKUPS
