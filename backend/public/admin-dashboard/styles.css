@@ -1397,3 +1397,16 @@ textarea {
 }
 
 /* END HIDE DUPLICATE SIDEBAR LOGOUT */
+/* BEGIN SIDEBAR LOGOUT ONLY */
+
+.sidebar-footer #logout-button {
+  display: block !important;
+  width: 100%;
+}
+
+.sidebar-footer {
+  display: grid !important;
+  flex: 0 0 auto;
+}
+
+/* END SIDEBAR LOGOUT ONLY */
