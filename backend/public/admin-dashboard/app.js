@@ -1497,3 +1497,342 @@ if (state.accessToken) {
 } else {
   showLogin();
 }
+// BEGIN MINDPULSE ADMIN UI V2
+(() => {
+  "use strict";
+
+  const themeButton =
+    document.querySelector("#theme-toggle");
+
+  const pageTitleElement =
+    document.querySelector("#page-title");
+
+  const contentElement =
+    document.querySelector("#content");
+
+  function applyTheme(theme) {
+    const normalized =
+      theme === "dark" ? "dark" : "light";
+
+    document.documentElement.dataset.theme =
+      normalized;
+
+    localStorage.setItem(
+      "mindpulse_admin_theme",
+      normalized
+    );
+
+    if (themeButton) {
+      const isDark = normalized === "dark";
+
+      themeButton.textContent =
+        isDark ? "Light mode" : "Dark mode";
+
+      themeButton.setAttribute(
+        "aria-pressed",
+        String(isDark)
+      );
+    }
+  }
+
+  const savedTheme =
+    localStorage.getItem("mindpulse_admin_theme");
+
+  const preferredTheme =
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)")
+      .matches
+      ? "dark"
+      : "light";
+
+  applyTheme(savedTheme || preferredTheme);
+
+  themeButton?.addEventListener("click", () => {
+    const nextTheme =
+      document.documentElement.dataset.theme === "dark"
+        ? "light"
+        : "dark";
+
+    applyTheme(nextTheme);
+  });
+
+  function metricAppearance(label) {
+    const value = label.toLowerCase();
+
+    if (
+      value.includes("risk") ||
+      value.includes("critical") ||
+      value.includes("safety") ||
+      value.includes("report")
+    ) {
+      return {
+        tone: "danger",
+        icon: "!"
+      };
+    }
+
+    if (
+      value.includes("pending") ||
+      value.includes("burnout") ||
+      value.includes("warning")
+    ) {
+      return {
+        tone: "warning",
+        icon: "△"
+      };
+    }
+
+    if (
+      value.includes("active") ||
+      value.includes("complete") ||
+      value.includes("healthy") ||
+      value.includes("success")
+    ) {
+      return {
+        tone: "success",
+        icon: "✓"
+      };
+    }
+
+    if (
+      value.includes("user") ||
+      value.includes("member")
+    ) {
+      return {
+        tone: "default",
+        icon: "◎"
+      };
+    }
+
+    if (
+      value.includes("scan") ||
+      value.includes("checkin")
+    ) {
+      return {
+        tone: "default",
+        icon: "◇"
+      };
+    }
+
+    if (
+      value.includes("message") ||
+      value.includes("conversation")
+    ) {
+      return {
+        tone: "default",
+        icon: "◌"
+      };
+    }
+
+    return {
+      tone: "default",
+      icon: "↗"
+    };
+  }
+
+  function enhanceMetricCards() {
+    const cards =
+      document.querySelectorAll(
+        ".metric-card:not([data-ui-v2])"
+      );
+
+    cards.forEach((card) => {
+      const label =
+        card.querySelector("span")
+          ?.textContent
+          ?.trim() || "";
+
+      const appearance =
+        metricAppearance(label);
+
+      card.dataset.uiV2 = "true";
+      card.dataset.tone = appearance.tone;
+      card.dataset.icon = appearance.icon;
+    });
+  }
+
+  function enhanceRawPanels() {
+    document
+      .querySelectorAll(".panel:not([data-raw-checked])")
+      .forEach((panel) => {
+        panel.dataset.rawChecked = "true";
+
+        const heading =
+          panel.querySelector(".panel-header h2");
+
+        const title =
+          heading?.textContent?.trim().toLowerCase() || "";
+
+        if (!title.startsWith("raw ")) {
+          return;
+        }
+
+        panel.classList.add("raw-panel");
+
+        const header =
+          panel.querySelector(".panel-header");
+
+        if (!header) {
+          return;
+        }
+
+        header.tabIndex = 0;
+        header.setAttribute("role", "button");
+        header.setAttribute(
+          "aria-expanded",
+          "false"
+        );
+
+        const toggle = () => {
+          const isOpen =
+            panel.classList.toggle("is-open");
+
+          header.setAttribute(
+            "aria-expanded",
+            String(isOpen)
+          );
+        };
+
+        header.addEventListener("click", toggle);
+
+        header.addEventListener(
+          "keydown",
+          (event) => {
+            if (
+              event.key === "Enter" ||
+              event.key === " "
+            ) {
+              event.preventDefault();
+              toggle();
+            }
+          }
+        );
+      });
+  }
+
+  function addOverviewHero() {
+    if (
+      pageTitleElement?.textContent?.trim() !==
+      "Overview"
+    ) {
+      return;
+    }
+
+    if (
+      document.querySelector(".overview-hero") ||
+      !document.querySelector(".metric-grid")
+    ) {
+      return;
+    }
+
+    const hero =
+      document.createElement("section");
+
+    hero.className = "overview-hero";
+
+    const copy =
+      document.createElement("div");
+
+    const heading =
+      document.createElement("h2");
+
+    heading.textContent =
+      "MindPulse operations overview";
+
+    const paragraph =
+      document.createElement("p");
+
+    paragraph.textContent =
+      "Monitor platform activity, user wellbeing, safety events and operational health from one secure workspace.";
+
+    copy.append(heading, paragraph);
+
+    const meta =
+      document.createElement("div");
+
+    meta.className = "overview-hero-meta";
+
+    const status =
+      document.createElement("strong");
+
+    status.textContent = "Platform services online";
+
+    const updated =
+      document.createElement("span");
+
+    updated.textContent =
+      `Updated ${new Date().toLocaleTimeString(
+        [],
+        {
+          hour: "2-digit",
+          minute: "2-digit"
+        }
+      )}`;
+
+    meta.append(status, updated);
+    hero.append(copy, meta);
+
+    contentElement?.prepend(hero);
+  }
+
+  function addSearchHint() {
+    const input =
+      document.querySelector(
+        '#search-form input[type="search"]'
+      );
+
+    if (
+      input &&
+      !input.dataset.hintAdded
+    ) {
+      input.dataset.hintAdded = "true";
+      input.placeholder =
+        "Search records — press / to focus";
+    }
+  }
+
+  function enhanceDashboard() {
+    enhanceMetricCards();
+    enhanceRawPanels();
+    addOverviewHero();
+    addSearchHint();
+  }
+
+  const observer =
+    new MutationObserver(() => {
+      enhanceDashboard();
+    });
+
+  observer.observe(
+    document.body,
+    {
+      childList: true,
+      subtree: true
+    }
+  );
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "/" &&
+        !["INPUT", "TEXTAREA"].includes(
+          document.activeElement?.tagName
+        )
+      ) {
+        const search =
+          document.querySelector(
+            '#search-form input[type="search"]'
+          );
+
+        if (search) {
+          event.preventDefault();
+          search.focus();
+        }
+      }
+    }
+  );
+
+  enhanceDashboard();
+})();
+// END MINDPULSE ADMIN UI V2

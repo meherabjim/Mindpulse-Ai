@@ -24,6 +24,7 @@
     name="description"
     content="MindPulse AI administration dashboard"
   >
+  <meta name="theme-color" content="#071c25">
   <title>MindPulse Admin</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -155,6 +156,24 @@
         </div>
 
         <div class="topbar-actions">
+          <div
+            class="connection-pill"
+            title="Backend connection active"
+          >
+            <span class="connection-dot"></span>
+            Live
+          </div>
+
+          <button
+            id="theme-toggle"
+            type="button"
+            class="theme-toggle"
+            aria-label="Switch dashboard theme"
+            aria-pressed="false"
+          >
+            Dark mode
+          </button>
+
           <div class="admin-identity">
             <strong id="admin-name">Administrator</strong>
             <span id="admin-email"></span>
