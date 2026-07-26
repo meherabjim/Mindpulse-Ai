@@ -127,7 +127,9 @@ class DashboardHomeTab extends StatefulWidget {
   State<DashboardHomeTab> createState() => _DashboardHomeTabState();
 }
 
-class _DashboardHomeTabState extends State<DashboardHomeTab> {
+class _DashboardHomeTabState extends State<DashboardHomeTab>
+    with WidgetsBindingObserver {
+  // MINDPULSE VERIFIED TODAY SCORE V9
   final WellnessScanService _wellnessService = WellnessScanService();
 
   double? _wellnessScore;
@@ -137,31 +139,83 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
     _loadWellness();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadWellness();
+    }
+  }
+
   Future<void> _loadWellness() async {
+    if (mounted) {
+      setState(() {
+        _wellnessLoading = true;
+      });
+    }
+
     try {
       final scan = await _wellnessService.getLatestScan();
 
-      if (!mounted) {
-        return;
+      final dynamic timestampValue;
+
+      if (scan == null) {
+        timestampValue = null;
+      } else {
+        timestampValue =
+            scan['completed_at'] ?? scan['created_at'] ?? scan['updated_at'];
       }
 
-      final rawScore = scan?['total_score'];
+      final timestampText = timestampValue == null
+          ? ''
+          : timestampValue.toString();
+
+      final parsedTimestamp = DateTime.tryParse(timestampText);
+
+      final localTimestamp = parsedTimestamp?.toLocal();
+
+      final isToday =
+          localTimestamp != null &&
+          DateUtils.isSameDay(localTimestamp, DateTime.now());
+
+      dynamic rawScore;
+      String? riskLevel;
+
+      if (isToday && scan != null) {
+        rawScore = scan['total_score'];
+        riskLevel = scan['risk_level']?.toString();
+      }
 
       final score = rawScore is num
           ? rawScore.toDouble()
           : double.tryParse(rawScore?.toString() ?? '');
 
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _wellnessScore = score;
-        _riskLevel = scan?['risk_level']?.toString();
+        _wellnessScore = score?.clamp(0.0, 100.0).toDouble();
+
+        _riskLevel = riskLevel;
         _wellnessLoading = false;
       });
     } catch (error) {
       debugPrint(
-        'MindPulse: Dashboard wellness refresh failed: $error',
+        'MindPulse: Dashboard wellness '
+        'refresh failed: $error',
       );
 
       if (!mounted) {
@@ -169,6 +223,8 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
       }
 
       setState(() {
+        _wellnessScore = null;
+        _riskLevel = null;
         _wellnessLoading = false;
       });
     }
@@ -254,9 +310,9 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
   }
 
   Widget _buildWellnessOverview(BuildContext context) {
-    final score = (_wellnessScore ?? 0.0)
-        .clamp(0.0, 100.0)
-        .toDouble();
+    final hasTodayScore = _wellnessScore != null;
+
+    final score = (_wellnessScore ?? 0.0).clamp(0.0, 100.0).toDouble();
 
     final storedRisk = _riskLevel?.trim() ?? '';
 
@@ -267,10 +323,14 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
         : 'NO DATA';
 
     final description = _wellnessLoading
-        ? 'Refreshing your latest wellness result...'
-        : _wellnessScore == null
-        ? 'Complete a Wellness Scan to see your current score.'
-        : 'This score is based on your latest completed Wellness Scan.';
+        ? 'Checking today’s completed Wellness Scan...'
+        : !hasTodayScore
+        ? 'No Wellness Scan has been completed today. '
+              'Complete a new scan to create today’s score.'
+        : 'Higher values indicate more strain. '
+              'Source: MindPulse Wellness Scan. '
+              'Informational only; not a WHO score '
+              'or medical diagnosis.';
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -296,7 +356,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
             children: [
               Expanded(
                 child: Text(
-                  "Today's wellness",
+                  'Today’s MindPulse strain',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 19,
@@ -319,7 +379,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    score.toStringAsFixed(1),
+                    hasTodayScore ? score.toStringAsFixed(1) : '--',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 42,
@@ -348,22 +408,16 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: LinearProgressIndicator(
-              value: score / 100,
+              value: hasTodayScore ? score / 100 : 0,
               minHeight: 10,
               backgroundColor: const Color(0x44FFFFFF),
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(
-                    Colors.white,
-                  ),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
           const SizedBox(height: 13),
           Text(
             description,
-            style: const TextStyle(
-              color: Color(0xFFEDEBFF),
-              height: 1.45,
-            ),
+            style: const TextStyle(color: Color(0xFFEDEBFF), height: 1.45),
           ),
         ],
       ),
@@ -500,7 +554,6 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
         title: 'Smart Reminders',
         subtitle: 'Gentle wellness reminders',
       ),
-
     ];
 
     return GridView.builder(
@@ -548,7 +601,6 @@ class _DashboardHomeTabState extends State<DashboardHomeTab> {
 
                 return;
               }
-
 
               if (tool.title == 'Mindful Screen Time') {
                 Navigator.of(context).push(
