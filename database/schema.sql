@@ -56,6 +56,12 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     height_cm DECIMAL(5,2) NULL,
     usual_water_ml SMALLINT UNSIGNED NULL,
     water_glass_ml SMALLINT UNSIGNED NULL DEFAULT 250,
+    typical_sleep_hours DECIMAL(4,2) NULL,
+    activity_pattern VARCHAR(40) NULL,
+    religion VARCHAR(40) NOT NULL DEFAULT 'prefer_not_to_say',
+    religion_other VARCHAR(120) NULL,
+    prayer_alarm_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    permission_mode VARCHAR(30) NOT NULL DEFAULT 'choose',
 
     gender ENUM(
         'male',

@@ -10,10 +10,23 @@ function normalizeName(value) {
         : '';
 }
 
+// MINDPULSE BANGLADESH LOCAL PHONE V2
 function normalizePhone(value) {
-    return typeof value === 'string'
-        ? value.trim().replace(/[\s()-]/g, '')
-        : '';
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    const compact = value.trim().replace(/[^0-9+]/g, '');
+
+    if (/^01[3-9][0-9]{8}$/.test(compact)) {
+        return `+88${compact}`;
+    }
+
+    if (/^8801[3-9][0-9]{8}$/.test(compact)) {
+        return `+${compact}`;
+    }
+
+    return compact;
 }
 
 function parseDateOnly(value) {
@@ -84,9 +97,9 @@ function validateRegister(body = {}) {
         errors.push('A valid email address is required.');
     }
 
-    if (!/^\+[1-9][0-9]{7,14}$/.test(phoneNumber)) {
+    if (!/^\+8801[3-9][0-9]{8}$/.test(phoneNumber)) {
         errors.push(
-            'Phone number must use international format, for example +8801XXXXXXXXX.'
+            'Enter an 11-digit Bangladesh phone number, for example 017XXXXXXXX.'
         );
     }
 

@@ -22,5 +22,6 @@ void main() {
     expect(find.text('Join MindPulse AI'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(6));
     expect(find.byType(CheckboxListTile), findsOneWidget);
+    expect(find.textContaining('Bangladesh number'), findsOneWidget);
   });
 }

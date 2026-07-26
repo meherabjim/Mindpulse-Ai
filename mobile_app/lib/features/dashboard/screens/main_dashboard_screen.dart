@@ -20,6 +20,8 @@ import '../../profile/screens/profile_screen.dart';
 import '../../digital_wellbeing/screens/mindful_screen_time_screen.dart';
 import '../../reminders/screens/smart_reminder_center_screen.dart';
 import '../../prayer/screens/prayer_settings_screen.dart';
+import '../../religion/screens/manual_faith_reminder_screen.dart';
+import '../../religion/services/faith_profile_service.dart';
 
 class MainDashboardScreen extends StatefulWidget {
   const MainDashboardScreen({super.key});
@@ -29,48 +31,73 @@ class MainDashboardScreen extends StatefulWidget {
 }
 
 class _MainDashboardScreenState extends State<MainDashboardScreen> {
+  final FaithProfileService _faithService = const FaithProfileService();
   int _selectedIndex = 0;
-
-  late final List<Widget> _pages;
+  FaithProfile? _faithProfile;
+  bool _faithLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _loadFaithProfile();
+  }
 
-    _pages = <Widget>[
-      DashboardHomeTab(
-        onOpenAiWellness: () {
-          if (!mounted) return;
-
-          setState(() {
-            _selectedIndex = 1;
-          });
-        },
-      ),
-      const AiWellnessScreen(),
-      const PrayerSettingsScreen(),
-      const ProfileScreen(),
-    ];
+  Future<void> _loadFaithProfile() async {
+    try {
+      final profile = await _faithService.load();
+      if (!mounted) return;
+      setState(() {
+        _faithProfile = profile;
+        _faithLoading = false;
+      });
+    } catch (error) {
+      debugPrint('MindPulse: faith profile load failed: $error');
+      if (!mounted) return;
+      setState(() {
+        _faithProfile = const FaithProfile(
+          religion: 'prefer_not_to_say',
+          religionLabel: 'Prefer not to say',
+          isIslam: false,
+        );
+        _faithLoading = false;
+      });
+    }
   }
 
   void _selectPage(int index) {
     if (index == _selectedIndex) return;
-
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_faithLoading || _faithProfile == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF7F7FC),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final faith = _faithProfile!;
+    final pages = <Widget>[
+      DashboardHomeTab(
+        faithProfile: faith,
+        onOpenAiWellness: () {
+          if (!mounted) return;
+          setState(() => _selectedIndex = 1);
+        },
+      ),
+      const AiWellnessScreen(),
+      faith.isIslam
+          ? const PrayerSettingsScreen()
+          : ManualFaithReminderScreen(faithProfile: faith),
+      const ProfileScreen(),
+    ];
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7FC),
-
       body: SafeArea(
         bottom: false,
-        child: IndexedStack(index: _selectedIndex, children: _pages),
+        child: IndexedStack(index: _selectedIndex, children: pages),
       ),
-
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'mindpulse_safety_fab',
         onPressed: () {
@@ -83,31 +110,36 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
         icon: const Icon(Icons.health_and_safety_outlined),
         label: const Text('Safety'),
       ),
-
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _selectPage,
         height: 72,
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFFE9E8FF),
-
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home_rounded),
             label: 'Home',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
             selectedIcon: Icon(Icons.auto_awesome),
             label: 'AI Wellness',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.mosque_outlined),
-            selectedIcon: Icon(Icons.mosque_rounded),
-            label: 'Prayer',
-          ),
-          NavigationDestination(
+          if (faith.isIslam)
+            const NavigationDestination(
+              icon: Icon(Icons.mosque_outlined),
+              selectedIcon: Icon(Icons.mosque_rounded),
+              label: 'Prayer',
+            )
+          else
+            const NavigationDestination(
+              icon: Icon(Icons.alarm_outlined),
+              selectedIcon: Icon(Icons.alarm_rounded),
+              label: 'Reminder',
+            ),
+          const NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),
             selectedIcon: Icon(Icons.person_rounded),
             label: 'Profile',
@@ -119,9 +151,14 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
 }
 
 class DashboardHomeTab extends StatefulWidget {
-  const DashboardHomeTab({required this.onOpenAiWellness, super.key});
+  const DashboardHomeTab({
+    required this.onOpenAiWellness,
+    required this.faithProfile,
+    super.key,
+  });
 
   final VoidCallback onOpenAiWellness;
+  final FaithProfile faithProfile;
 
   @override
   State<DashboardHomeTab> createState() => _DashboardHomeTabState();
@@ -242,6 +279,11 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
               const SizedBox(height: 24),
               _buildWellnessOverview(context),
               const SizedBox(height: 20),
+              if (widget.faithProfile.religion != 'no_religion' &&
+                  widget.faithProfile.religion != 'prefer_not_to_say') ...[
+                _buildFaithCard(context),
+                const SizedBox(height: 20),
+              ],
               // HUMAN_COMPANION_DASHBOARD_ENTRY_V1
               const CompanionDashboardCard(),
               const SizedBox(height: 20),
@@ -259,6 +301,47 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFaithCard(BuildContext context) {
+    final faith = widget.faithProfile;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(17),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              faith.isIslam ? Icons.mosque_outlined : Icons.alarm_outlined,
+              color: const Color(0xFF6059E8),
+              size: 30,
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Religion: ${faith.religionLabel}',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    faith.isIslam
+                        ? 'Prayer times and alarm settings are available in the Prayer tab. Alarm sound follows your On/Off choice.'
+                        : 'Only reminders you create manually are available. Muslim prayer content is hidden.',
+                    style: const TextStyle(height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

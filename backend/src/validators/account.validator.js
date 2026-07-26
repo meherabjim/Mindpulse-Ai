@@ -12,6 +12,33 @@ const USER_TYPES = new Set([
     'other'
 ]);
 
+
+// MINDPULSE FIRST LOGIN FAITH PERMISSIONS V2
+const ACTIVITY_PATTERNS = new Set([
+    'mostly_sitting',
+    'lightly_active',
+    'moderately_active',
+    'very_active'
+]);
+
+const RELIGIONS = new Set([
+    'islam',
+    'hinduism',
+    'christianity',
+    'buddhism',
+    'judaism',
+    'sikhism',
+    'other',
+    'no_religion',
+    'prefer_not_to_say'
+]);
+
+const PERMISSION_MODES = new Set([
+    'enable_all',
+    'choose',
+    'continue_without'
+]);
+
 const THEME_MODES = new Set([
     'system',
     'light',
@@ -254,7 +281,8 @@ function validateProfileData(body = {}, requireField = true) {
         ['weight_kg', 20, 400, 'Weight'],
         ['height_cm', 80, 250, 'Height'],
         ['usual_water_ml', 0, 10000, 'Usual water intake'],
-        ['water_glass_ml', 100, 1000, 'Water glass size']
+        ['water_glass_ml', 100, 1000, 'Water glass size'],
+        ['typical_sleep_hours', 0, 24, 'Typical sleep hours']
     ];
 
     numericProfileFields.forEach(([
@@ -332,6 +360,53 @@ function validateProfileData(body = {}, requireField = true) {
         errors,
         data
     });
+
+
+    if (hasOwn(body, 'activity_pattern')) {
+        if (
+            body.activity_pattern === null ||
+            body.activity_pattern === ''
+        ) {
+            data.activity_pattern = null;
+        } else if (!ACTIVITY_PATTERNS.has(body.activity_pattern)) {
+            errors.push('Activity pattern is not supported.');
+        } else {
+            data.activity_pattern = body.activity_pattern;
+        }
+    }
+
+    if (hasOwn(body, 'religion')) {
+        if (!RELIGIONS.has(body.religion)) {
+            errors.push('Religion selection is not supported.');
+        } else {
+            data.religion = body.religion;
+        }
+    }
+
+    readNullableString({
+        object: body,
+        field: 'religion_other',
+        label: 'Religion name',
+        maximumLength: 120,
+        errors,
+        data
+    });
+
+    if (hasOwn(body, 'prayer_alarm_enabled')) {
+        if (typeof body.prayer_alarm_enabled !== 'boolean') {
+            errors.push('Prayer alarm preference must be true or false.');
+        } else {
+            data.prayer_alarm_enabled = body.prayer_alarm_enabled;
+        }
+    }
+
+    if (hasOwn(body, 'permission_mode')) {
+        if (!PERMISSION_MODES.has(body.permission_mode)) {
+            errors.push('Permission setup choice is not supported.');
+        } else {
+            data.permission_mode = body.permission_mode;
+        }
+    }
 
     if (hasOwn(body, 'preferred_language')) {
         const language =

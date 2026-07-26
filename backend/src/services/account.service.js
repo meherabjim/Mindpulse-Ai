@@ -41,6 +41,12 @@ const PROFILE_COLUMNS = {
     height_cm: 'height_cm',
     usual_water_ml: 'usual_water_ml',
     water_glass_ml: 'water_glass_ml',
+    typical_sleep_hours: 'typical_sleep_hours',
+    activity_pattern: 'activity_pattern',
+    religion: 'religion',
+    religion_other: 'religion_other',
+    prayer_alarm_enabled: 'prayer_alarm_enabled',
+    permission_mode: 'permission_mode',
     gender: 'gender',
     occupation: 'occupation',
     user_type: 'user_type',
@@ -98,6 +104,16 @@ function mapProfile(row) {
             row.water_glass_ml === null
                 ? 250
                 : Number(row.water_glass_ml),
+        typical_sleep_hours:
+            row.typical_sleep_hours === null
+                ? null
+                : Number(row.typical_sleep_hours),
+        activity_pattern: row.activity_pattern,
+        religion: row.religion || 'prefer_not_to_say',
+        religion_other: row.religion_other,
+        prayer_alarm_enabled:
+            booleanValue(row.prayer_alarm_enabled),
+        permission_mode: row.permission_mode || 'choose',
         bmi: calculateBmi(row.weight_kg, row.height_cm),
         age_range: row.age_range,
         gender: row.gender,
@@ -399,6 +415,12 @@ async function getProfile(userId) {
             p.height_cm,
             p.usual_water_ml,
             p.water_glass_ml,
+            p.typical_sleep_hours,
+            p.activity_pattern,
+            p.religion,
+            p.religion_other,
+            p.prayer_alarm_enabled,
+            p.permission_mode,
             p.age_range,
             p.gender,
             p.occupation,
@@ -458,6 +480,12 @@ async function getOnboardingStatus(
             p.height_cm,
             p.usual_water_ml,
             p.water_glass_ml,
+            p.typical_sleep_hours,
+            p.activity_pattern,
+            p.religion,
+            p.religion_other,
+            p.prayer_alarm_enabled,
+            p.permission_mode,
             p.age_range,
             p.gender,
             p.occupation,
@@ -547,6 +575,16 @@ async function getOnboardingStatus(
                 profile.water_glass_ml === null
                     ? 250
                     : Number(profile.water_glass_ml),
+            typical_sleep_hours:
+                profile.typical_sleep_hours === null
+                    ? null
+                    : Number(profile.typical_sleep_hours),
+            activity_pattern: profile.activity_pattern,
+            religion: profile.religion || 'prefer_not_to_say',
+            religion_other: profile.religion_other,
+            prayer_alarm_enabled:
+                booleanValue(profile.prayer_alarm_enabled),
+            permission_mode: profile.permission_mode || 'choose',
             age_range: profile.age_range,
             gender: profile.gender,
             occupation: profile.occupation,

@@ -48,15 +48,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  // MINDPULSE BANGLADESH LOCAL PHONE V2
   String _normalizedPhone(String value) {
-    return value.replaceAll(RegExp(r'[\s()-]'), '');
+    final compact = value.replaceAll(RegExp(r'[^0-9+]'), '');
+
+    if (RegExp(r'^01[3-9][0-9]{8}$').hasMatch(compact)) {
+      return '+88$compact';
+    }
+
+    if (RegExp(r'^8801[3-9][0-9]{8}$').hasMatch(compact)) {
+      return '+$compact';
+    }
+
+    return compact;
   }
 
   String? _validatePhone(String? value) {
-    final phone = _normalizedPhone(value?.trim() ?? '');
+    final compact = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
 
-    if (!RegExp(r'^\+[1-9][0-9]{7,14}$').hasMatch(phone)) {
-      return 'Use international format, for example +8801XXXXXXXXX.';
+    if (!RegExp(r'^01[3-9][0-9]{8}$').hasMatch(compact)) {
+      return 'Enter an 11-digit Bangladesh number, for example 017XXXXXXXX.';
     }
 
     return null;
@@ -267,9 +278,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     autofillHints: const <String>[
                       AutofillHints.telephoneNumber,
                     ],
+                    maxLength: 11,
                     decoration: const InputDecoration(
                       labelText: 'Phone number',
-                      helperText: 'Include country code, for example +880.',
+                      hintText: '01XXXXXXXXX',
+                      helperText:
+                          'Enter the 11-digit Bangladesh number. +88 is added automatically.',
                       prefixIcon: Icon(Icons.phone_outlined),
                     ),
                     validator: _validatePhone,
