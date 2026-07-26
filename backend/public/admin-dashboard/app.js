@@ -762,6 +762,14 @@ function renderTableInto(
   table.append(tbody);
   scroll.append(table);
   parent.append(scroll);
+
+  // MINDPULSE TABLE START POSITION FIX V5
+  // Every newly rendered table begins at its first column.
+  scroll.scrollLeft = 0;
+
+  window.requestAnimationFrame(() => {
+    scroll.scrollLeft = 0;
+  });
 }
 
 function renderList(payload, view) {
@@ -1019,6 +1027,9 @@ function openDialog({
     path
   };
 
+  dialogJson.readOnly = false;
+  dialogJson.classList.remove("is-read-only");
+
   dialogTitle.textContent = title;
   dialogDescription.textContent = description;
   dialogJson.value = JSON.stringify(payload, null, 2);
@@ -1037,6 +1048,9 @@ function openDialog({
 function openReadOnly(title, payload) {
   state.modalAction = null;
 
+  dialogJson.readOnly = true;
+  dialogJson.classList.add("is-read-only");
+
   dialogTitle.textContent = title;
   dialogDescription.textContent =
     "This is the complete response returned by the backend.";
@@ -1054,6 +1068,10 @@ function openReadOnly(title, payload) {
 
 function closeDialog() {
   state.modalAction = null;
+
+  dialogJson.readOnly = false;
+  dialogJson.classList.remove("is-read-only");
+
   dialogSubmit.classList.remove("is-hidden");
 
   if (typeof dialog.close === "function") {

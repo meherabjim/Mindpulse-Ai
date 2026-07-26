@@ -1694,3 +1694,29 @@ textarea {
 }
 
 /* END MINDPULSE FACTORY RESET UI */
+/* BEGIN ADMIN TABLE DIALOG UX FIX V5 */
+
+/*
+  Prevent animated or retained horizontal positioning.
+  JavaScript also resets newly rendered tables to scrollLeft 0.
+*/
+
+.table-scroll {
+  scroll-behavior: auto;
+}
+
+/* Clearly distinguish backend response details from editable JSON. */
+
+#dialog-json.is-read-only {
+  cursor: default;
+  background: var(--surface-muted);
+  color: var(--text);
+  caret-color: transparent;
+}
+
+#dialog-json.is-read-only:focus {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+/* END ADMIN TABLE DIALOG UX FIX V5 */
