@@ -632,6 +632,59 @@ function renderRawJson(parent, payload) {
   parent.append(pre);
 }
 
+/* MINDPULSE ZERO ACTIVITY TREND FILTER V6 */
+
+function trendNumericValue(row, keys) {
+  if (!row || typeof row !== "object") {
+    return 0;
+  }
+
+  for (const key of keys) {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        row,
+        key
+      )
+    ) {
+      const value = Number(row[key]);
+
+      if (Number.isFinite(value)) {
+        return value;
+      }
+    }
+  }
+
+  return 0;
+}
+
+function hasPlatformTrendActivity(row) {
+  const activityGroups = [
+    [
+      "newUsers",
+      "new_users"
+    ],
+    [
+      "checkins",
+      "checkIns",
+      "check_ins",
+      "dailyCheckins",
+      "daily_checkins"
+    ],
+    [
+      "wellnessScans",
+      "wellness_scans"
+    ],
+    [
+      "burnoutAssessments",
+      "burnout_assessments"
+    ]
+  ];
+
+  return activityGroups.some(
+    (keys) =>
+      trendNumericValue(row, keys) > 0
+  );
+}
 function renderOverview(summaryPayload, trendsPayload) {
   content.replaceChildren();
 
@@ -672,18 +725,31 @@ function renderOverview(summaryPayload, trendsPayload) {
   const trendsPanel = createPanel("30-day platform trends");
   const trendsBody = document.createElement("div");
   trendsBody.className = "panel-body";
+  const trendRows =
+    findRows(trendsPayload);
 
-  const trendRows = findRows(trendsPayload);
+  const visibleTrendRows =
+    trendRows.filter(
+      hasPlatformTrendActivity
+    );
 
-  if (trendRows.length) {
+  if (visibleTrendRows.length) {
     renderTableInto(
       trendsBody,
-      trendRows,
+      visibleTrendRows,
       "overview",
       false
     );
   } else {
-    renderRawJson(trendsBody, trendsPayload);
+    const empty =
+      document.createElement("div");
+
+    empty.className = "empty-card";
+
+    empty.textContent =
+      "No activity was recorded in the last 30 days.";
+
+    trendsBody.append(empty);
   }
 
   trendsPanel.append(trendsBody);
