@@ -11,7 +11,10 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  // MINDPULSE REGISTRATION PHONE DOB V1
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _dateOfBirthController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmationController = TextEditingController();
@@ -25,6 +28,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
+    _dateOfBirthController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmationController.dispose();
@@ -41,6 +46,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return 'Use 120 characters or fewer.';
     }
     return null;
+  }
+
+  String _normalizedPhone(String value) {
+    return value.replaceAll(RegExp(r'[\s()-]'), '');
+  }
+
+  String? _validatePhone(String? value) {
+    final phone = _normalizedPhone(value?.trim() ?? '');
+
+    if (!RegExp(r'^\+[1-9][0-9]{7,14}$').hasMatch(phone)) {
+      return 'Use international format, for example +8801XXXXXXXXX.';
+    }
+
+    return null;
+  }
+
+  String? _validateDateOfBirth(String? value) {
+    final date = DateTime.tryParse(value?.trim() ?? '');
+
+    if (date == null) {
+      return 'Select your date of birth.';
+    }
+
+    final today = DateTime.now();
+    var age = today.year - date.year;
+
+    if (today.month < date.month ||
+        (today.month == date.month && today.day < date.day)) {
+      age -= 1;
+    }
+
+    if (age < 13 || age > 120) {
+      return 'MindPulse registration currently supports ages 13 to 120.';
+    }
+
+    return null;
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final today = DateTime.now();
+    final initialDate = DateTime(today.year - 18, today.month, today.day);
+
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(today.year - 120, 1, 1),
+      lastDate: DateTime(today.year - 13, today.month, today.day),
+      helpText: 'Select date of birth',
+    );
+
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    final month = selected.month.toString().padLeft(2, '0');
+    final day = selected.day.toString().padLeft(2, '0');
+
+    setState(() {
+      _dateOfBirthController.text = '${selected.year}-$month-$day';
+    });
   }
 
   String? _validateEmail(String? value) {
@@ -99,6 +164,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await _service.register(
         fullName: _nameController.text,
+        phoneNumber: _normalizedPhone(_phoneController.text),
+        dateOfBirth: _dateOfBirthController.text,
         email: _emailController.text,
         password: _passwordController.text,
       );
@@ -190,6 +257,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     validator: _validateName,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _phoneController,
+                    enabled: !_submitting,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const <String>[
+                      AutofillHints.telephoneNumber,
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Phone number',
+                      helperText: 'Include country code, for example +880.',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                    validator: _validatePhone,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _dateOfBirthController,
+                    enabled: !_submitting,
+                    readOnly: true,
+                    onTap: _submitting ? null : _pickDateOfBirth,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Date of birth',
+                      helperText: 'Used to calculate age safely over time.',
+                      prefixIcon: Icon(Icons.cake_outlined),
+                      suffixIcon: Icon(Icons.calendar_month_outlined),
+                    ),
+                    validator: _validateDateOfBirth,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

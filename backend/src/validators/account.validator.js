@@ -1,4 +1,4 @@
-﻿const GENDERS = new Set([
+const GENDERS = new Set([
     'male',
     'female',
     'other',
@@ -204,6 +204,88 @@ function validateProfileData(body = {}, requireField = true) {
         maximumLength: 30,
         errors,
         data
+    });
+
+    if (hasOwn(body, 'date_of_birth')) {
+        if (body.date_of_birth === null || body.date_of_birth === '') {
+            data.date_of_birth = null;
+        } else if (
+            typeof body.date_of_birth !== 'string' ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(body.date_of_birth)
+        ) {
+            errors.push('Date of birth must use YYYY-MM-DD format.');
+        } else {
+            const date = new Date(`${body.date_of_birth}T00:00:00.000Z`);
+
+            if (
+                Number.isNaN(date.getTime()) ||
+                date.toISOString().slice(0, 10) !== body.date_of_birth
+            ) {
+                errors.push('Date of birth must be a valid date.');
+            } else {
+                const today = new Date();
+                let age =
+                    today.getUTCFullYear() -
+                    date.getUTCFullYear();
+
+                const beforeBirthday =
+                    today.getUTCMonth() < date.getUTCMonth() ||
+                    (
+                        today.getUTCMonth() === date.getUTCMonth() &&
+                        today.getUTCDate() < date.getUTCDate()
+                    );
+
+                if (beforeBirthday) {
+                    age -= 1;
+                }
+
+                if (age < 13 || age > 120) {
+                    errors.push(
+                        'Date of birth must represent an age from 13 to 120.'
+                    );
+                } else {
+                    data.date_of_birth = body.date_of_birth;
+                }
+            }
+        }
+    }
+
+    const numericProfileFields = [
+        ['weight_kg', 20, 400, 'Weight'],
+        ['height_cm', 80, 250, 'Height'],
+        ['usual_water_ml', 0, 10000, 'Usual water intake'],
+        ['water_glass_ml', 100, 1000, 'Water glass size']
+    ];
+
+    numericProfileFields.forEach(([
+        field,
+        minimum,
+        maximum,
+        label
+    ]) => {
+        if (!hasOwn(body, field)) {
+            return;
+        }
+
+        if (body[field] === null || body[field] === '') {
+            data[field] = null;
+            return;
+        }
+
+        const value = Number(body[field]);
+
+        if (
+            !Number.isFinite(value) ||
+            value < minimum ||
+            value > maximum
+        ) {
+            errors.push(
+                `${label} must be between ${minimum} and ${maximum}.`
+            );
+            return;
+        }
+
+        data[field] = value;
     });
 
     if (hasOwn(body, 'gender')) {

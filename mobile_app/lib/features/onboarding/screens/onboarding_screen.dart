@@ -21,7 +21,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final TextEditingController _nameController = TextEditingController();
 
-  final TextEditingController _ageRangeController = TextEditingController();
+  // MINDPULSE BODY PROFILE BMI V1
+  final TextEditingController _dateOfBirthController = TextEditingController();
+  final TextEditingController _weightController = TextEditingController();
+  final TextEditingController _heightFeetController = TextEditingController();
+  final TextEditingController _heightInchesController = TextEditingController();
+  final TextEditingController _waterGlassesController = TextEditingController();
 
   final TextEditingController _occupationController = TextEditingController();
 
@@ -40,6 +45,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _gender = '';
   String _userType = '';
   String _languageCode = 'en';
+  int _waterGlassMl = 250;
 
   bool _aiAnalysisEnabled = true;
   bool _journalAnalysisEnabled = false;
@@ -71,7 +77,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void dispose() {
     _pageController.dispose();
     _nameController.dispose();
-    _ageRangeController.dispose();
+    _dateOfBirthController.dispose();
+    _weightController.dispose();
+    _heightFeetController.dispose();
+    _heightInchesController.dispose();
+    _waterGlassesController.dispose();
     _occupationController.dispose();
     _wellnessGoalController.dispose();
     _timezoneController.dispose();
@@ -105,7 +115,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       setState(() {
         _nameController.text = profile['full_name']?.toString() ?? '';
 
-        _ageRangeController.text = profile['age_range']?.toString() ?? '';
+        _dateOfBirthController.text =
+            profile['date_of_birth']?.toString().split('T').first ?? '';
+
+        final weight = _number(profile['weight_kg']);
+        final heightCm = _number(profile['height_cm']);
+        final waterMl = _number(profile['usual_water_ml']);
+        final glassMl = _number(profile['water_glass_ml']);
+
+        _weightController.text = weight == null
+            ? ''
+            : weight.toStringAsFixed(1);
+
+        if (heightCm != null) {
+          final totalInches = (heightCm / 2.54).round();
+          final feet = totalInches ~/ 12;
+          final inches = totalInches % 12;
+
+          _heightFeetController.text = feet.toString();
+          _heightInchesController.text = inches.toString();
+        }
+
+        _waterGlassMl = glassMl?.round() ?? 250;
+
+        if (waterMl != null && _waterGlassMl > 0) {
+          _waterGlassesController.text = (waterMl / _waterGlassMl)
+              .round()
+              .toString();
+        }
 
         _occupationController.text = profile['occupation']?.toString() ?? '';
 
@@ -215,6 +252,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return false;
       }
 
+      final bodyError = _validateBodyProfile();
+
+      if (bodyError != null) {
+        setState(() {
+          _errorMessage = bodyError;
+        });
+
+        return false;
+      }
+
       if (timezone.isEmpty) {
         setState(() {
           _errorMessage = 'Please enter your timezone.';
@@ -247,7 +294,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       await _service.completeOnboarding(
         profile: <String, dynamic>{
           'full_name': _nameController.text.trim(),
-          'age_range': _nullableText(_ageRangeController.text),
+          'date_of_birth': _nullableText(_dateOfBirthController.text),
+          'weight_kg': _weightKg,
+          'height_cm': _heightCm,
+          'usual_water_ml': _usualWaterMl,
+          'water_glass_ml': _waterGlassMl,
           'gender': _gender.isEmpty ? null : _gender,
           'occupation': _nullableText(_occupationController.text),
           'user_type': _userType.isEmpty ? null : _userType,
@@ -328,6 +379,80 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final normalized = value.trim();
 
     return normalized.isEmpty ? null : normalized;
+  }
+
+  double? _number(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '');
+  }
+
+  double? get _weightKg {
+    return double.tryParse(_weightController.text.trim());
+  }
+
+  double? get _heightCm {
+    final feet = int.tryParse(_heightFeetController.text.trim());
+    final inches = int.tryParse(_heightInchesController.text.trim());
+
+    if (feet == null || inches == null) {
+      return null;
+    }
+
+    return (feet * 30.48) + (inches * 2.54);
+  }
+
+  int? get _usualWaterMl {
+    final glasses = int.tryParse(_waterGlassesController.text.trim());
+
+    if (glasses == null) {
+      return null;
+    }
+
+    return glasses * _waterGlassMl;
+  }
+
+  double? get _bmi {
+    final weight = _weightKg;
+    final height = _heightCm;
+
+    if (weight == null || height == null || height <= 0) {
+      return null;
+    }
+
+    final metres = height / 100;
+
+    return weight / (metres * metres);
+  }
+
+  String? _validateBodyProfile() {
+    final weight = _weightKg;
+    final height = _heightCm;
+    final feet = int.tryParse(_heightFeetController.text.trim());
+    final inches = int.tryParse(_heightInchesController.text.trim());
+    final glasses = int.tryParse(_waterGlassesController.text.trim());
+
+    if (weight == null || weight < 20 || weight > 400) {
+      return 'Enter a weight between 20 and 400 kg.';
+    }
+
+    if (feet == null ||
+        inches == null ||
+        inches < 0 ||
+        inches > 11 ||
+        height == null ||
+        height < 80 ||
+        height > 250) {
+      return 'Enter a valid height in feet and inches.';
+    }
+
+    if (glasses == null || glasses < 0 || glasses > 40) {
+      return 'Enter daily water intake between 0 and 40 glasses.';
+    }
+
+    return null;
   }
 
   Map<String, dynamic> _asMap(dynamic value) {
@@ -421,13 +546,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildProfileStep() {
+    final bmi = _bmi;
+    final waterMl = _usualWaterMl;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _introCard(
-          icon: Icons.person_outline_rounded,
-          title: 'Tell us about yourself',
-          text: 'This information helps personalize your wellness experience.',
+          icon: Icons.monitor_weight_outlined,
+          title: 'Your body and daily baseline',
+          text:
+              'We use these details for BMI screening and personalized wellness support.',
         ),
         const SizedBox(height: 14),
         Card(
@@ -437,24 +566,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               children: [
                 TextField(
                   controller: _nameController,
-                  maxLength: 120,
-                  textCapitalization: TextCapitalization.words,
+                  readOnly: true,
                   decoration: const InputDecoration(
                     labelText: 'Full name',
+                    helperText: 'Provided during registration.',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 TextField(
-                  controller: _ageRangeController,
-                  maxLength: 30,
+                  controller: _dateOfBirthController,
+                  readOnly: true,
                   decoration: const InputDecoration(
-                    labelText: 'Age range',
-                    hintText: '18-24',
+                    labelText: 'Date of birth',
+                    helperText: 'Provided during registration.',
                     prefixIcon: Icon(Icons.cake_outlined),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _gender,
                   decoration: const InputDecoration(
@@ -482,53 +611,118 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  controller: _occupationController,
-                  maxLength: 120,
-                  decoration: const InputDecoration(
-                    labelText: 'Occupation',
-                    prefixIcon: Icon(Icons.work_outline),
+                  controller: _weightController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: _userType,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
-                    labelText: 'User type',
-                    prefixIcon: Icon(Icons.badge_outlined),
+                    labelText: 'Weight (kg)',
+                    prefixIcon: Icon(Icons.monitor_weight_outlined),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('Not specified')),
-                    DropdownMenuItem(value: 'student', child: Text('Student')),
-                    DropdownMenuItem(
-                      value: 'employee',
-                      child: Text('Employee'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'self_employed',
-                      child: Text('Self-employed'),
-                    ),
-                    DropdownMenuItem(value: 'other', child: Text('Other')),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _userType = value ?? '';
-                    });
-                  },
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _wellnessGoalController,
-                  maxLength: 150,
-                  minLines: 2,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Main wellness goal',
-                    hintText: 'Reduce stress and improve sleep',
-                    alignLabelWithHint: true,
-                    prefixIcon: Icon(Icons.flag_outlined),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _heightFeetController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Height (feet)',
+                          prefixIcon: Icon(Icons.height_rounded),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _heightInchesController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Inches',
+                          hintText: '0â€“11',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _waterGlassesController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Water glasses per day',
+                          prefixIcon: Icon(Icons.water_drop_outlined),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: _waterGlassMl,
+                        decoration: const InputDecoration(
+                          labelText: 'Glass size',
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 200, child: Text('200 ml')),
+                          DropdownMenuItem(value: 250, child: Text('250 ml')),
+                          DropdownMenuItem(value: 300, child: Text('300 ml')),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _waterGlassMl = value;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0EFFF),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        bmi == null
+                            ? 'BMI preview: add weight and height'
+                            : 'BMI preview: ${bmi.toStringAsFixed(1)}',
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 5),
+                      const Text(
+                        'Source: WHO BMI formula. Screening information only; not a diagnosis.',
+                        style: TextStyle(fontSize: 12.5, height: 1.35),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        waterMl == null
+                            ? 'Current fluid intake: add glasses and glass size'
+                            : 'Current fluid intake: ${(waterMl / 1000).toStringAsFixed(2)} L/day',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 5),
+                      const Text(
+                        'General guide: 6â€“8 cups or glasses daily. Needs may be higher with heat, activity, pregnancy or illness. Source: NHS.',
+                        style: TextStyle(fontSize: 12.5, height: 1.35),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 TextField(
                   controller: _timezoneController,
                   maxLength: 60,

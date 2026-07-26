@@ -1,4 +1,4 @@
-﻿const database = require('../config/database');
+const database = require('../config/database');
 const AppError = require('../utils/AppError');
 
 const pool = database.pool || database;
@@ -36,6 +36,11 @@ const PROFILE_COLUMNS = {
     full_name: 'full_name',
     profile_photo_url: 'profile_photo_url',
     age_range: 'age_range',
+    date_of_birth: 'date_of_birth',
+    weight_kg: 'weight_kg',
+    height_cm: 'height_cm',
+    usual_water_ml: 'usual_water_ml',
+    water_glass_ml: 'water_glass_ml',
     gender: 'gender',
     occupation: 'occupation',
     user_type: 'user_type',
@@ -48,12 +53,52 @@ function booleanValue(value) {
     return Boolean(Number(value));
 }
 
+function calculateBmi(weightKg, heightCm) {
+    const weight = Number(weightKg);
+    const height = Number(heightCm);
+
+    if (
+        !Number.isFinite(weight) ||
+        !Number.isFinite(height) ||
+        weight <= 0 ||
+        height <= 0
+    ) {
+        return null;
+    }
+
+    const heightMetres = height / 100;
+
+    return Number(
+        (weight / (heightMetres * heightMetres)).toFixed(1)
+    );
+}
+
 function mapProfile(row) {
     return {
         id: Number(row.id),
         email: row.email,
+        phone_number: row.phone_number,
+        phone_verified: Boolean(row.phone_verified_at),
         full_name: row.full_name,
         profile_photo_url: row.profile_photo_url,
+        date_of_birth: row.date_of_birth,
+        weight_kg:
+            row.weight_kg === null
+                ? null
+                : Number(row.weight_kg),
+        height_cm:
+            row.height_cm === null
+                ? null
+                : Number(row.height_cm),
+        usual_water_ml:
+            row.usual_water_ml === null
+                ? null
+                : Number(row.usual_water_ml),
+        water_glass_ml:
+            row.water_glass_ml === null
+                ? 250
+                : Number(row.water_glass_ml),
+        bmi: calculateBmi(row.weight_kg, row.height_cm),
         age_range: row.age_range,
         gender: row.gender,
         occupation: row.occupation,
@@ -340,6 +385,8 @@ async function getProfile(userId) {
         SELECT
             u.id,
             u.email,
+            u.phone_number,
+            u.phone_verified_at,
             u.account_status,
             u.onboarding_completed,
             u.email_verified_at,
@@ -347,6 +394,11 @@ async function getProfile(userId) {
 
             p.full_name,
             p.profile_photo_url,
+            p.date_of_birth,
+            p.weight_kg,
+            p.height_cm,
+            p.usual_water_ml,
+            p.water_glass_ml,
             p.age_range,
             p.gender,
             p.occupation,
@@ -401,6 +453,11 @@ async function getOnboardingStatus(
         SELECT
             u.onboarding_completed,
             p.full_name,
+            p.date_of_birth,
+            p.weight_kg,
+            p.height_cm,
+            p.usual_water_ml,
+            p.water_glass_ml,
             p.age_range,
             p.gender,
             p.occupation,
@@ -473,6 +530,23 @@ async function getOnboardingStatus(
 
         profile_summary: {
             full_name: profile.full_name,
+            date_of_birth: profile.date_of_birth,
+            weight_kg:
+                profile.weight_kg === null
+                    ? null
+                    : Number(profile.weight_kg),
+            height_cm:
+                profile.height_cm === null
+                    ? null
+                    : Number(profile.height_cm),
+            usual_water_ml:
+                profile.usual_water_ml === null
+                    ? null
+                    : Number(profile.usual_water_ml),
+            water_glass_ml:
+                profile.water_glass_ml === null
+                    ? 250
+                    : Number(profile.water_glass_ml),
             age_range: profile.age_range,
             gender: profile.gender,
             occupation: profile.occupation,

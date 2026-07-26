@@ -1,4 +1,4 @@
-﻿CREATE DATABASE IF NOT EXISTS mindpulse_ai
+CREATE DATABASE IF NOT EXISTS mindpulse_ai
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS users (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 
     email VARCHAR(191) NOT NULL,
+    phone_number VARCHAR(30) NULL,
+    phone_verified_at TIMESTAMP NULL DEFAULT NULL,
     password_hash VARCHAR(255) NOT NULL,
 
     account_status ENUM(
@@ -30,6 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
     deleted_at TIMESTAMP NULL DEFAULT NULL,
 
     CONSTRAINT uq_users_email UNIQUE (email),
+    CONSTRAINT uq_users_phone UNIQUE (phone_number),
 
     INDEX idx_users_account_status (account_status),
     INDEX idx_users_created_at (created_at),
@@ -48,6 +51,11 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     profile_photo_url VARCHAR(500) NULL,
 
     age_range VARCHAR(30) NULL,
+    date_of_birth DATE NULL,
+    weight_kg DECIMAL(5,2) NULL,
+    height_cm DECIMAL(5,2) NULL,
+    usual_water_ml SMALLINT UNSIGNED NULL,
+    water_glass_ml SMALLINT UNSIGNED NULL DEFAULT 250,
 
     gender ENUM(
         'male',

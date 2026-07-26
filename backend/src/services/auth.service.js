@@ -1,4 +1,4 @@
-﻿const bcrypt = require('bcrypt');
+const bcrypt = require('bcrypt');
 
 const database = require('../config/database');
 const AppError = require('../utils/AppError');
@@ -38,6 +38,8 @@ function buildUserResponse(user) {
     return {
         id: Number(user.id),
         email: user.email,
+        phone_number: user.phone_number || null,
+        phone_verified: Boolean(user.phone_verified_at),
         full_name: user.full_name || null,
 
         account_status:
@@ -144,6 +146,8 @@ async function register(
 ) {
     const {
         fullName,
+        phoneNumber,
+        dateOfBirth,
         email,
         password
     } = registrationData;
@@ -157,18 +161,25 @@ async function register(
         const [existingRows] =
             await connection.execute(
                 `
-                SELECT id
+                SELECT
+                    id,
+                    email,
+                    phone_number
                 FROM users
-                WHERE email = ?
+                WHERE email = ? OR phone_number = ?
                 LIMIT 1
                 `,
-                [email]
+                [email, phoneNumber]
             );
 
         if (existingRows.length > 0) {
+            const existing = existingRows[0];
+
             throw new AppError(
                 409,
-                'An account already exists with this email address.'
+                existing.email === email
+                    ? 'An account already exists with this email address.'
+                    : 'An account already exists with this phone number.'
             );
         }
 
@@ -193,14 +204,16 @@ async function register(
                 `
                 INSERT INTO users (
                     email,
+                    phone_number,
                     password_hash,
                     account_status,
                     onboarding_completed
                 )
-                VALUES (?, ?, 'active', FALSE)
+                VALUES (?, ?, ?, 'active', FALSE)
                 `,
                 [
                     email,
+                    phoneNumber,
                     passwordHash
                 ]
             );
@@ -213,20 +226,24 @@ async function register(
             INSERT INTO user_profiles (
                 user_id,
                 full_name,
+                date_of_birth,
                 preferred_language,
                 timezone
             )
-            VALUES (?, ?, 'en', 'Asia/Dhaka')
+            VALUES (?, ?, ?, 'en', 'Asia/Dhaka')
             `,
             [
                 userId,
-                fullName
+                fullName,
+                dateOfBirth
             ]
         );
 
         const user = {
             id: userId,
             email,
+            phone_number: phoneNumber,
+            phone_verified_at: null,
             full_name: fullName,
             account_status: 'active',
             onboarding_completed: false,
@@ -278,6 +295,8 @@ async function login(
             SELECT
                 u.id,
                 u.email,
+                u.phone_number,
+                u.phone_verified_at,
                 u.password_hash,
                 u.account_status,
                 u.onboarding_completed,
@@ -400,6 +419,8 @@ async function refreshSession(
 
                     u.id,
                     u.email,
+                    u.phone_number,
+                    u.phone_verified_at,
                     u.account_status,
                     u.onboarding_completed,
                     u.email_verified_at,
@@ -488,6 +509,8 @@ async function refreshSession(
         const user = {
             id: session.user_id,
             email: session.email,
+            phone_number: session.phone_number,
+            phone_verified_at: session.phone_verified_at,
             full_name: session.full_name,
             account_status:
                 session.account_status,
@@ -572,6 +595,8 @@ async function getCurrentUser(userId) {
             SELECT
                 u.id,
                 u.email,
+                u.phone_number,
+                u.phone_verified_at,
                 u.account_status,
                 u.onboarding_completed,
                 u.email_verified_at,
@@ -579,6 +604,11 @@ async function getCurrentUser(userId) {
 
                 p.full_name,
                 p.profile_photo_url,
+                p.date_of_birth,
+                p.weight_kg,
+                p.height_cm,
+                p.usual_water_ml,
+                p.water_glass_ml,
                 p.age_range,
                 p.gender,
                 p.occupation,
@@ -616,10 +646,35 @@ async function getCurrentUser(userId) {
     return {
         id: Number(user.id),
         email: user.email,
+        phone_number: user.phone_number,
+        phone_verified: Boolean(user.phone_verified_at),
         full_name: user.full_name,
 
         profile_photo_url:
             user.profile_photo_url,
+
+        date_of_birth:
+            user.date_of_birth,
+
+        weight_kg:
+            user.weight_kg === null
+                ? null
+                : Number(user.weight_kg),
+
+        height_cm:
+            user.height_cm === null
+                ? null
+                : Number(user.height_cm),
+
+        usual_water_ml:
+            user.usual_water_ml === null
+                ? null
+                : Number(user.usual_water_ml),
+
+        water_glass_ml:
+            user.water_glass_ml === null
+                ? 250
+                : Number(user.water_glass_ml),
 
         age_range:
             user.age_range,

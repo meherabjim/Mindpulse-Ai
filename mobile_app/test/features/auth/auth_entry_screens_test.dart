@@ -4,7 +4,9 @@ import 'package:mindpulse_ai/features/auth/screens/login_screen.dart';
 import 'package:mindpulse_ai/features/auth/screens/register_screen.dart';
 
 void main() {
-  testWidgets('login exposes registration without prayer setup', (tester) async {
+  testWidgets('login exposes registration without prayer setup', (
+    tester,
+  ) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     expect(find.text('MindPulse AI'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);
@@ -18,7 +20,7 @@ void main() {
   ) async {
     await tester.pumpWidget(const MaterialApp(home: RegisterScreen()));
     expect(find.text('Join MindPulse AI'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNWidgets(4));
+    expect(find.byType(TextFormField), findsNWidgets(6));
     expect(find.byType(CheckboxListTile), findsOneWidget);
   });
 }

@@ -26,6 +26,8 @@ class RegistrationService {
 
   Future<void> register({
     required String fullName,
+    required String phoneNumber,
+    required String dateOfBirth,
     required String email,
     required String password,
   }) async {
@@ -39,6 +41,8 @@ class RegistrationService {
             },
             body: jsonEncode(<String, String>{
               'full_name': fullName.trim(),
+              'phone_number': phoneNumber.trim(),
+              'date_of_birth': dateOfBirth.trim(),
               'email': email.trim().toLowerCase(),
               'password': password,
             }),

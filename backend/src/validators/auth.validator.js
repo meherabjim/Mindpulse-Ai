@@ -1,4 +1,4 @@
-﻿function normalizeEmail(value) {
+function normalizeEmail(value) {
     return typeof value === 'string'
         ? value.trim().toLowerCase()
         : '';
@@ -10,6 +10,50 @@ function normalizeName(value) {
         : '';
 }
 
+function normalizePhone(value) {
+    return typeof value === 'string'
+        ? value.trim().replace(/[\s()-]/g, '')
+        : '';
+}
+
+function parseDateOnly(value) {
+    if (
+        typeof value !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(value)
+    ) {
+        return null;
+    }
+
+    const date = new Date(`${value}T00:00:00.000Z`);
+
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return date.toISOString().slice(0, 10) === value
+        ? date
+        : null;
+}
+
+function ageOnDate(dateOfBirth, currentDate = new Date()) {
+    let age =
+        currentDate.getUTCFullYear() -
+        dateOfBirth.getUTCFullYear();
+
+    const beforeBirthday =
+        currentDate.getUTCMonth() < dateOfBirth.getUTCMonth() ||
+        (
+            currentDate.getUTCMonth() === dateOfBirth.getUTCMonth() &&
+            currentDate.getUTCDate() < dateOfBirth.getUTCDate()
+        );
+
+    if (beforeBirthday) {
+        age -= 1;
+    }
+
+    return age;
+}
+
 function isValidEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -17,6 +61,12 @@ function isValidEmail(email) {
 function validateRegister(body = {}) {
     const fullName = normalizeName(body.full_name);
     const email = normalizeEmail(body.email);
+    const phoneNumber = normalizePhone(body.phone_number);
+    const dateOfBirthText =
+        typeof body.date_of_birth === 'string'
+            ? body.date_of_birth.trim()
+            : '';
+    const dateOfBirth = parseDateOnly(dateOfBirthText);
     const password =
         typeof body.password === 'string'
             ? body.password
@@ -32,6 +82,24 @@ function validateRegister(body = {}) {
 
     if (!isValidEmail(email) || email.length > 191) {
         errors.push('A valid email address is required.');
+    }
+
+    if (!/^\+[1-9][0-9]{7,14}$/.test(phoneNumber)) {
+        errors.push(
+            'Phone number must use international format, for example +8801XXXXXXXXX.'
+        );
+    }
+
+    if (!dateOfBirth) {
+        errors.push('A valid date of birth is required.');
+    } else {
+        const age = ageOnDate(dateOfBirth);
+
+        if (age < 13 || age > 120) {
+            errors.push(
+                'Registration currently supports ages 13 to 120.'
+            );
+        }
     }
 
     if (password.length < 8 || password.length > 72) {
@@ -52,6 +120,8 @@ function validateRegister(body = {}) {
         errors,
         data: {
             fullName,
+            phoneNumber,
+            dateOfBirth: dateOfBirthText,
             email,
             password
         }
