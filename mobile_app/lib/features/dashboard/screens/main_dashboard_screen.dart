@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/settings/app_preferences_controller.dart';
 import '../../companion/widgets/companion_dashboard_card.dart';
 
 import '../../safety/screens/emergency_support_screen.dart';
@@ -22,7 +23,9 @@ import '../../reminders/screens/smart_reminder_center_screen.dart';
 import '../../prayer/screens/prayer_settings_screen.dart';
 import '../../religion/screens/manual_faith_reminder_screen.dart';
 import '../../religion/services/faith_profile_service.dart';
+import '../../religion/services/manual_faith_reminder_service.dart';
 
+// MINDPULSE NON ISLAM REMINDER DASHBOARD V3
 class MainDashboardScreen extends StatefulWidget {
   const MainDashboardScreen({super.key});
 
@@ -33,6 +36,8 @@ class MainDashboardScreen extends StatefulWidget {
 class _MainDashboardScreenState extends State<MainDashboardScreen> {
   final FaithProfileService _faithService = const FaithProfileService();
   int _selectedIndex = 0;
+  final GlobalKey<_DashboardHomeTabState> _homeKey =
+      GlobalKey<_DashboardHomeTabState>();
   FaithProfile? _faithProfile;
   bool _faithLoading = true;
 
@@ -67,23 +72,32 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   void _selectPage(int index) {
     if (index == _selectedIndex) return;
     setState(() => _selectedIndex = index);
+    if (index == 0) {
+      _homeKey.currentState?.refreshFaithData();
+    }
+  }
+
+  String _t(String english, String bangla) {
+    return AppPreferencesController.instance.text(english, bangla);
   }
 
   @override
   Widget build(BuildContext context) {
     if (_faithLoading || _faithProfile == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF7F7FC),
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final faith = _faithProfile!;
     final pages = <Widget>[
       DashboardHomeTab(
+        key: _homeKey,
         faithProfile: faith,
         onOpenAiWellness: () {
           if (!mounted) return;
           setState(() => _selectedIndex = 1);
+        },
+        onOpenFaith: () {
+          if (!mounted) return;
+          setState(() => _selectedIndex = 2);
         },
       ),
       const AiWellnessScreen(),
@@ -93,7 +107,6 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
       const ProfileScreen(),
     ];
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FC),
       body: SafeArea(
         bottom: false,
         child: IndexedStack(index: _selectedIndex, children: pages),
@@ -108,41 +121,39 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           );
         },
         icon: const Icon(Icons.health_and_safety_outlined),
-        label: const Text('Safety'),
+        label: Text(_t('Safety', 'নিরাপত্তা')),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _selectPage,
         height: 72,
-        backgroundColor: Colors.white,
-        indicatorColor: const Color(0xFFE9E8FF),
         destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
+          NavigationDestination(
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home_rounded),
+            label: _t('Home', 'হোম'),
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'AI Wellness',
+          NavigationDestination(
+            icon: const Icon(Icons.auto_awesome_outlined),
+            selectedIcon: const Icon(Icons.auto_awesome),
+            label: _t('AI Wellness', 'AI ওয়েলনেস'),
           ),
           if (faith.isIslam)
-            const NavigationDestination(
-              icon: Icon(Icons.mosque_outlined),
-              selectedIcon: Icon(Icons.mosque_rounded),
-              label: 'Prayer',
+            NavigationDestination(
+              icon: const Icon(Icons.mosque_outlined),
+              selectedIcon: const Icon(Icons.mosque_rounded),
+              label: _t('Prayer', 'নামাজ'),
             )
           else
-            const NavigationDestination(
-              icon: Icon(Icons.alarm_outlined),
-              selectedIcon: Icon(Icons.alarm_rounded),
-              label: 'Reminder',
+            NavigationDestination(
+              icon: const Icon(Icons.alarm_outlined),
+              selectedIcon: const Icon(Icons.alarm_rounded),
+              label: _t('Reminders', 'রিমাইন্ডার'),
             ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
+          NavigationDestination(
+            icon: const Icon(Icons.person_outline_rounded),
+            selectedIcon: const Icon(Icons.person_rounded),
+            label: _t('Profile', 'প্রোফাইল'),
           ),
         ],
       ),
@@ -153,11 +164,13 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
 class DashboardHomeTab extends StatefulWidget {
   const DashboardHomeTab({
     required this.onOpenAiWellness,
+    required this.onOpenFaith,
     required this.faithProfile,
     super.key,
   });
 
   final VoidCallback onOpenAiWellness;
+  final VoidCallback onOpenFaith;
   final FaithProfile faithProfile;
 
   @override
@@ -168,10 +181,13 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
     with WidgetsBindingObserver {
   // MINDPULSE VERIFIED TODAY SCORE V9
   final WellnessScanService _wellnessService = WellnessScanService();
+  final ManualFaithReminderService _manualReminderService =
+      ManualFaithReminderService();
 
   double? _wellnessScore;
   String? _riskLevel;
   bool _wellnessLoading = true;
+  List<ManualFaithReminder> _manualReminders = <ManualFaithReminder>[];
 
   @override
   void initState() {
@@ -180,6 +196,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
     WidgetsBinding.instance.addObserver(this);
 
     _loadWellness();
+    _loadManualReminders();
   }
 
   @override
@@ -267,6 +284,62 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
     }
   }
 
+  Future<void> refreshFaithData() async {
+    await Future.wait<void>([_loadWellness(), _loadManualReminders()]);
+  }
+
+  Future<void> _loadManualReminders() async {
+    if (widget.faithProfile.isIslam) {
+      if (mounted) {
+        setState(() => _manualReminders = <ManualFaithReminder>[]);
+      }
+      return;
+    }
+    try {
+      final reminders = await _manualReminderService.load();
+      if (!mounted) return;
+      setState(() => _manualReminders = reminders);
+    } catch (error) {
+      debugPrint('MindPulse: manual reminder load failed: $error');
+    }
+  }
+
+  ManualFaithReminder? get _nextManualReminder {
+    final active = _manualReminders.where((item) => item.enabled).toList();
+    if (active.isEmpty) return null;
+    final now = DateTime.now();
+    ManualFaithReminder? selected;
+    DateTime? selectedTime;
+    for (final reminder in active) {
+      for (var offset = 0; offset < 8; offset++) {
+        final day = DateTime(
+          now.year,
+          now.month,
+          now.day,
+        ).add(Duration(days: offset));
+        if (!reminder.weekdays.contains(day.weekday)) continue;
+        final candidate = DateTime(
+          day.year,
+          day.month,
+          day.day,
+          reminder.hour,
+          reminder.minute,
+        );
+        if (!candidate.isAfter(now)) continue;
+        if (selectedTime == null || candidate.isBefore(selectedTime)) {
+          selected = reminder;
+          selectedTime = candidate;
+        }
+        break;
+      }
+    }
+    return selected;
+  }
+
+  String _t(String english, String bangla) {
+    return AppPreferencesController.instance.text(english, bangla);
+  }
+
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
@@ -290,7 +363,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
               _buildAiCard(context),
               const SizedBox(height: 24),
               Text(
-                'Your wellness tools',
+                _t('Your wellness tools', 'আপনার ওয়েলনেস টুলস'),
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -306,40 +379,84 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
 
   Widget _buildFaithCard(BuildContext context) {
     final faith = widget.faithProfile;
+    final reminder = _nextManualReminder;
+    final timeText = reminder == null
+        ? null
+        : TimeOfDay(
+            hour: reminder.hour,
+            minute: reminder.minute,
+          ).format(context);
+
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(17),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              faith.isIslam ? Icons.mosque_outlined : Icons.alarm_outlined,
-              color: const Color(0xFF6059E8),
-              size: 30,
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Religion: ${faith.religionLabel}',
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    faith.isIslam
-                        ? 'Prayer times and alarm settings are available in the Prayer tab. Alarm sound follows your On/Off choice.'
-                        : 'Only reminders you create manually are available. Muslim prayer content is hidden.',
-                    style: const TextStyle(height: 1.4),
-                  ),
-                ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: widget.onOpenFaith,
+        child: Padding(
+          padding: const EdgeInsets.all(17),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                faith.isIslam ? Icons.mosque_outlined : Icons.alarm_outlined,
+                color: const Color(0xFF6059E8),
+                size: 30,
               ),
-            ),
-          ],
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _t(
+                        'Religion: ${faith.religionLabel}',
+                        'ধর্ম: ${faith.religionLabel}',
+                      ),
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    if (faith.isIslam)
+                      Text(
+                        _t(
+                          'Prayer times and alarm settings are available in the Prayer tab. Alarm sound follows your On/Off choice.',
+                          'নামাজের সময় ও অ্যালার্ম সেটিংস নামাজ ট্যাবে দেখা যাবে। আপনার On/Off পছন্দ অনুযায়ী অ্যালার্ম বাজবে।',
+                        ),
+                        style: const TextStyle(height: 1.4),
+                      )
+                    else if (reminder != null)
+                      Text(
+                        _t(
+                          'Next manual reminder: ${reminder.title} • $timeText',
+                          'পরবর্তী ম্যানুয়াল রিমাইন্ডার: ${reminder.title} • $timeText',
+                        ),
+                        style: const TextStyle(height: 1.4),
+                      )
+                    else
+                      Text(
+                        _t(
+                          'No active manual reminder. Open Reminders to create or enable one. Muslim prayer content is hidden.',
+                          'কোনো চালু ম্যানুয়াল রিমাইন্ডার নেই। নতুন রিমাইন্ডার তৈরি বা চালু করতে রিমাইন্ডার ট্যাব খুলুন। মুসলিম নামাজের তথ্য লুকানো আছে।',
+                        ),
+                        style: const TextStyle(height: 1.4),
+                      ),
+                    const SizedBox(height: 10),
+                    Text(
+                      faith.isIslam
+                          ? _t('Open Prayer', 'নামাজ খুলুন')
+                          : _t('Open Reminders', 'রিমাইন্ডার খুলুন'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
         ),
       ),
     );
@@ -378,7 +495,10 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
               ),
               const SizedBox(height: 2),
               Text(
-                'Your personal wellness companion',
+                _t(
+                  'Your personal wellness companion',
+                  'আপনার ব্যক্তিগত ওয়েলনেস সহকারী',
+                ),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF74748A),
                 ),
@@ -406,10 +526,15 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
         : 'NO DATA';
 
     final description = _wellnessLoading
-        ? 'Checking today’s completed Wellness Scan...'
+        ? _t(
+            'Checking today’s completed Wellness Scan...',
+            'আজকের Wellness Scan যাচাই করা হচ্ছে...',
+          )
         : !hasTodayScore
-        ? 'No Wellness Scan has been completed today. '
-              'Complete a new scan to create today’s score.'
+        ? _t(
+            'No Wellness Scan has been completed today. Complete a new scan to create today’s score.',
+            'আজ কোনো Wellness Scan সম্পন্ন হয়নি। আজকের স্কোর তৈরি করতে নতুন একটি scan সম্পন্ন করুন।',
+          )
         : 'Higher values indicate more strain. '
               'Source: MindPulse Wellness Scan. '
               'Informational only; not a WHO score '
@@ -435,11 +560,11 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Expanded(
                 child: Text(
-                  'Today’s MindPulse strain',
+                  _t('Today’s MindPulse strain', 'আজকের MindPulse strain'),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 19,
@@ -447,7 +572,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                   ),
                 ),
               ),
-              Icon(Icons.favorite_rounded, color: Colors.white),
+              const Icon(Icons.favorite_rounded, color: Colors.white),
             ],
           ),
           const SizedBox(height: 18),

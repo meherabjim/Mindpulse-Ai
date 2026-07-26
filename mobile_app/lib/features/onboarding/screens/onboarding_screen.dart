@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../core/settings/app_preferences_controller.dart';
 import '../../account/services/account_service.dart';
 import '../../companion/screens/companion_permissions_screen.dart';
 import '../../companion/services/movement_insight_service.dart';
@@ -8,8 +9,10 @@ import '../../dashboard/screens/main_dashboard_screen.dart';
 import '../../digital_wellbeing/services/screen_time_service.dart';
 import '../../prayer/services/prayer_alarm_bridge.dart';
 import '../../prayer/services/prayer_service.dart';
+import '../../religion/services/manual_faith_reminder_service.dart';
 
 // MINDPULSE FIRST LOGIN FAITH PERMISSIONS V2
+// MINDPULSE MANUAL FAITH ONBOARDING V3
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
     this.initialStatus = const <String, dynamic>{},
@@ -29,6 +32,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late final PrayerService _prayerService = PrayerService();
   final ScreenTimeService _screenTimeService = ScreenTimeService();
   final MovementInsightService _movementService = MovementInsightService();
+  final ManualFaithReminderService _manualReminderService =
+      ManualFaithReminderService();
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dateOfBirthController = TextEditingController();
@@ -39,6 +44,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final TextEditingController _occupationController = TextEditingController();
   final TextEditingController _wellnessGoalController = TextEditingController();
   final TextEditingController _otherReligionController =
+      TextEditingController();
+  final TextEditingController _manualReminderTitleController =
       TextEditingController();
   final TextEditingController _timezoneController = TextEditingController(
     text: 'Asia/Dhaka',
@@ -59,6 +66,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   double _typicalSleepHours = 7;
 
   bool _prayerAlarmEnabled = false;
+  bool _manualReminderRequested = false;
+  bool _manualReminderAlarmEnabled = true;
+  TimeOfDay _manualReminderTime = const TimeOfDay(hour: 19, minute: 0);
+  Set<int> _manualReminderWeekdays = <int>{1, 2, 3, 4, 5, 6, 7};
   bool _aiAnalysisEnabled = true;
   bool _journalAnalysisEnabled = false;
   bool _analyticsEnabled = false;
@@ -72,25 +83,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String? _errorMessage;
   String? _permissionMessage;
 
-  static const List<String> _stepTitles = <String>[
-    'Body and daily baseline',
-    'Sleep and activity',
-    'Religion and reminders',
-    'Language and preferences',
-    'Permissions',
-    'Privacy and consent',
+  List<String> get _stepTitles => <String>[
+    _t('Body and daily baseline', 'শরীর ও দৈনিক ভিত্তি'),
+    _t('Sleep and activity', 'ঘুম ও দৈনিক কার্যক্রম'),
+    _t('Religion and reminders', 'ধর্ম ও রিমাইন্ডার'),
+    _t('Language and preferences', 'ভাষা ও পছন্দ'),
+    _t('Permissions', 'অনুমতি'),
+    _t('Privacy and consent', 'গোপনীয়তা ও সম্মতি'),
   ];
 
-  static const Map<String, String> _religionLabels = <String, String>{
-    'islam': 'Islam',
-    'hinduism': 'Hinduism',
-    'christianity': 'Christianity',
-    'buddhism': 'Buddhism',
-    'judaism': 'Judaism',
-    'sikhism': 'Sikhism',
-    'other': 'Other',
-    'no_religion': 'No religion',
-    'prefer_not_to_say': 'Prefer not to say',
+  Map<String, String> get _religionLabels => <String, String>{
+    'islam': _t('Islam', 'ইসলাম'),
+    'hinduism': _t('Hinduism', 'হিন্দুধর্ম'),
+    'christianity': _t('Christianity', 'খ্রিষ্টধর্ম'),
+    'buddhism': _t('Buddhism', 'বৌদ্ধধর্ম'),
+    'judaism': _t('Judaism', 'ইহুদি ধর্ম'),
+    'sikhism': _t('Sikhism', 'শিখধর্ম'),
+    'other': _t('Other', 'অন্যান্য'),
+    'no_religion': _t('No religion', 'কোনো ধর্ম নেই'),
+    'prefer_not_to_say': _t('Prefer not to say', 'বলতে চাই না'),
   };
 
   @override
@@ -112,6 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _occupationController.dispose();
     _wellnessGoalController.dispose();
     _otherReligionController.dispose();
+    _manualReminderTitleController.dispose();
     _timezoneController.dispose();
     super.dispose();
   }
@@ -122,6 +134,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _service.getProfile(),
         _service.getSettings(),
         _service.getOnboardingStatus(),
+        _manualReminderService.load(),
       ]);
       final profile = _asMap(results[0]);
       final settings = _asMap(results[1]);
@@ -129,6 +142,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final appSettings = _asMap(settings['app_settings']);
       final notifications = _asMap(settings['notification_preferences']);
       final consents = _asMap(onboarding['consents']);
+      final manualReminders = results[3] is List<ManualFaithReminder>
+          ? results[3] as List<ManualFaithReminder>
+          : <ManualFaithReminder>[];
+      ManualFaithReminder? onboardingReminder;
+      for (final reminder in manualReminders) {
+        if (reminder.id == 'onboarding_manual_v1') {
+          onboardingReminder = reminder;
+          break;
+        }
+      }
 
       if (!mounted) return;
       setState(() {
@@ -169,6 +192,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _religion = profile['religion']?.toString() ?? 'prefer_not_to_say';
         _permissionMode = profile['permission_mode']?.toString() ?? 'choose';
         _prayerAlarmEnabled = profile['prayer_alarm_enabled'] == true;
+        if (onboardingReminder != null) {
+          _manualReminderRequested = true;
+          _manualReminderAlarmEnabled = onboardingReminder.enabled;
+          _manualReminderTitleController.text = onboardingReminder.title;
+          _manualReminderTime = TimeOfDay(
+            hour: onboardingReminder.hour,
+            minute: onboardingReminder.minute,
+          );
+          _manualReminderWeekdays = onboardingReminder.weekdays.toSet();
+        }
         _typicalSleepHours = (_number(profile['typical_sleep_hours']) ?? 7)
             .clamp(3, 14)
             .toDouble();
@@ -189,6 +222,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _notificationPreferences = notifications;
         _loading = false;
       });
+      await AppPreferencesController.instance.apply(
+        languageCode: _languageCode,
+        themeMode: _themeMode,
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -250,7 +287,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else if (_currentStep == 2) {
       if (_religion == 'other' &&
           _otherReligionController.text.trim().isEmpty) {
-        error = 'Write the religion name or choose another option.';
+        error = _t(
+          'Write the religion name or choose another option.',
+          'ধর্মের নাম লিখুন অথবা অন্য একটি অপশন বেছে নিন।',
+        );
+      } else if (_manualReminderRequested &&
+          _manualReminderTitleController.text.trim().length < 2) {
+        error = _t(
+          'Enter a name for the manual reminder.',
+          'ম্যানুয়াল রিমাইন্ডারের একটি নাম লিখুন।',
+        );
+      } else if (_manualReminderRequested && _manualReminderWeekdays.isEmpty) {
+        error = _t(
+          'Choose at least one day for the reminder.',
+          'রিমাইন্ডারের জন্য অন্তত একটি দিন বেছে নিন।',
+        );
       }
     } else if (_currentStep == 4) {
       if (!const <String>{
@@ -342,7 +393,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         },
       );
 
-      await _applyFaithAlarmPreference();
+      if (_religion == 'islam') {
+        await _saveManualReminderPreference();
+        await _applyFaithAlarmPreference();
+      } else {
+        await _applyFaithAlarmPreference();
+        await _saveManualReminderPreference();
+      }
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(builder: (_) => const MainDashboardScreen()),
@@ -354,6 +411,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _saveManualReminderPreference() async {
+    final reminders = await _manualReminderService.load();
+    final updated = reminders
+        .where((item) => item.id != 'onboarding_manual_v1')
+        .toList();
+
+    if (_supportsManualReminder && _manualReminderRequested) {
+      updated.add(
+        ManualFaithReminder(
+          id: 'onboarding_manual_v1',
+          title: _manualReminderTitleController.text.trim(),
+          hour: _manualReminderTime.hour,
+          minute: _manualReminderTime.minute,
+          weekdays: _manualReminderWeekdays.toList()..sort(),
+          enabled:
+              _manualReminderAlarmEnabled &&
+              _permissionMode != 'continue_without',
+        ),
+      );
+    }
+
+    await _manualReminderService.save(updated);
   }
 
   Future<void> _applyFaithAlarmPreference() async {
@@ -382,19 +463,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       await _prayerBridge.requestNotificationPermission();
       await _movementService.requestPermission();
-      var locationPermission = await Geolocator.checkPermission();
-      if (locationPermission == LocationPermission.denied) {
-        locationPermission = await Geolocator.requestPermission();
+      if (_religion == 'islam') {
+        var locationPermission = await Geolocator.checkPermission();
+        if (locationPermission == LocationPermission.denied) {
+          locationPermission = await Geolocator.requestPermission();
+        }
       }
-      if (_religion == 'islam' && _prayerAlarmEnabled) {
+      final manualAlarmRequested =
+          _supportsManualReminder &&
+          _manualReminderRequested &&
+          _manualReminderAlarmEnabled;
+      if ((_religion == 'islam' && _prayerAlarmEnabled) ||
+          manualAlarmRequested) {
         await _prayerBridge.requestExactAlarmPermission();
       }
       if (!mounted) return;
       setState(() {
         _permissionMode = 'enable_all';
-        _permissionMessage =
-            'Notification, activity and location requests were started. '
-            'Android Usage Access opens separately.';
+        _permissionMessage = _religion == 'islam'
+            ? _t(
+                'Notification, activity and location requests were started. Android Usage Access opens separately.',
+                'নোটিফিকেশন, কার্যক্রম ও লোকেশন অনুমতির ধাপ শুরু হয়েছে। Android Usage Access আলাদাভাবে খুলবে।',
+              )
+            : _t(
+                'Notification and activity requests were started. Location is not needed for this profile. Android Usage Access opens separately.',
+                'নোটিফিকেশন ও কার্যক্রম অনুমতির ধাপ শুরু হয়েছে। এই প্রোফাইলের জন্য লোকেশন প্রয়োজন নেই। Android Usage Access আলাদাভাবে খুলবে।',
+              );
       });
       await _screenTimeService.openUsageAccessSettings();
     } catch (error) {
@@ -414,6 +508,114 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         builder: (_) => const CompanionPermissionsScreen(),
       ),
     );
+  }
+
+  Future<void> _showReligionPicker() async {
+    final searchController = TextEditingController();
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        var query = '';
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final entries = _religionLabels.entries.where((entry) {
+              return entry.value.toLowerCase().contains(query.toLowerCase());
+            }).toList();
+
+            return SafeArea(
+              child: SizedBox(
+                height: MediaQuery.sizeOf(context).height * 0.72,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    18,
+                    4,
+                    18,
+                    MediaQuery.viewInsetsOf(context).bottom + 18,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _t('Choose religion', 'ধর্ম নির্বাচন করুন'),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: searchController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          labelText: _t('Search', 'খুঁজুন'),
+                          prefixIcon: const Icon(Icons.search_rounded),
+                        ),
+                        onChanged: (value) {
+                          setSheetState(() => query = value.trim());
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: entries.length,
+                          itemBuilder: (context, index) {
+                            final entry = entries[index];
+                            final chosen = entry.key == _religion;
+                            return ListTile(
+                              leading: Icon(
+                                chosen
+                                    ? Icons.radio_button_checked_rounded
+                                    : Icons.radio_button_off_rounded,
+                              ),
+                              title: Text(entry.value),
+                              onTap: () =>
+                                  Navigator.of(sheetContext).pop(entry.key),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    searchController.dispose();
+
+    if (selected == null || !mounted) return;
+    setState(() {
+      _religion = selected;
+      if (selected != 'islam') _prayerAlarmEnabled = false;
+      if (selected == 'islam' ||
+          selected == 'no_religion' ||
+          selected == 'prefer_not_to_say') {
+        _manualReminderRequested = false;
+      }
+    });
+  }
+
+  Future<void> _pickManualReminderTime() async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: _manualReminderTime,
+    );
+    if (selected != null && mounted) {
+      setState(() => _manualReminderTime = selected);
+    }
+  }
+
+  bool get _supportsManualReminder {
+    return _religion != 'islam' &&
+        _religion != 'no_religion' &&
+        _religion != 'prefer_not_to_say';
+  }
+
+  String _t(String english, String bangla) {
+    return AppPreferencesController.instance.text(english, bangla);
   }
 
   bool _notificationValue(String key) {
@@ -488,10 +690,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F7FC),
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: const Text('Welcome to MindPulse'),
+          title: Text(_t('Welcome to MindPulse', 'MindPulse-এ স্বাগতম')),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -524,12 +725,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Step ${_currentStep + 1} of ${_stepTitles.length}',
+            _t(
+              'Step ${_currentStep + 1} of ${_stepTitles.length}',
+              'ধাপ ${_currentStep + 1} / ${_stepTitles.length}',
+            ),
             style: const TextStyle(
               color: Color(0xFF6059E8),
               fontWeight: FontWeight.w800,
@@ -572,9 +776,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         _introCard(
           icon: Icons.monitor_weight_outlined,
-          title: 'Your body and daily baseline',
-          text:
-              'These details support BMI screening and personalized wellness guidance.',
+          title: _t('Your body and daily baseline', 'আপনার শরীর ও দৈনিক তথ্য'),
+          text: _t(
+            'These details support BMI screening and personalized wellness guidance.',
+            'এই তথ্য BMI স্ক্রিনিং ও ব্যক্তিগত ওয়েলনেস পরামর্শে সহায়তা করে।',
+          ),
         ),
         const SizedBox(height: 14),
         Card(
@@ -585,40 +791,57 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 TextField(
                   controller: _nameController,
                   readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Full name',
-                    helperText: 'Provided during registration.',
-                    prefixIcon: Icon(Icons.person_outline),
+                  decoration: InputDecoration(
+                    labelText: _t('Full name', 'পূর্ণ নাম'),
+                    helperText: _t(
+                      'Provided during registration.',
+                      'রেজিস্ট্রেশনের সময় দেওয়া হয়েছে।',
+                    ),
+                    prefixIcon: const Icon(Icons.person_outline),
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _dateOfBirthController,
                   readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Date of birth',
-                    helperText: 'Provided during registration.',
-                    prefixIcon: Icon(Icons.cake_outlined),
+                  decoration: InputDecoration(
+                    labelText: _t('Date of birth', 'জন্মতারিখ'),
+                    helperText: _t(
+                      'Provided during registration.',
+                      'রেজিস্ট্রেশনের সময় দেওয়া হয়েছে।',
+                    ),
+                    prefixIcon: const Icon(Icons.cake_outlined),
                   ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _gender,
-                  decoration: const InputDecoration(
-                    labelText: 'Gender',
-                    prefixIcon: Icon(Icons.people_outline),
+                  decoration: InputDecoration(
+                    labelText: _t('Gender', 'লিঙ্গ'),
+                    prefixIcon: const Icon(Icons.people_outline),
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: '',
-                      child: Text('Prefer not to specify'),
+                      child: Text(
+                        _t('Prefer not to specify', 'উল্লেখ করতে চাই না'),
+                      ),
                     ),
-                    DropdownMenuItem(value: 'male', child: Text('Male')),
-                    DropdownMenuItem(value: 'female', child: Text('Female')),
-                    DropdownMenuItem(value: 'other', child: Text('Other')),
+                    DropdownMenuItem(
+                      value: 'male',
+                      child: Text(_t('Male', 'পুরুষ')),
+                    ),
+                    DropdownMenuItem(
+                      value: 'female',
+                      child: Text(_t('Female', 'নারী')),
+                    ),
+                    DropdownMenuItem(
+                      value: 'other',
+                      child: Text(_t('Other', 'অন্যান্য')),
+                    ),
                     DropdownMenuItem(
                       value: 'prefer_not_to_say',
-                      child: Text('Prefer not to say'),
+                      child: Text(_t('Prefer not to say', 'বলতে চাই না')),
                     ),
                   ],
                   onChanged: (value) => setState(() => _gender = value ?? ''),
@@ -630,9 +853,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     decimal: true,
                   ),
                   onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Weight (kg)',
-                    prefixIcon: Icon(Icons.monitor_weight_outlined),
+                  decoration: InputDecoration(
+                    labelText: _t('Weight (kg)', 'ওজন (কেজি)'),
+                    prefixIcon: const Icon(Icons.monitor_weight_outlined),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -643,9 +866,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         controller: _heightFeetController,
                         keyboardType: TextInputType.number,
                         onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          labelText: 'Height (feet)',
-                          prefixIcon: Icon(Icons.height_rounded),
+                        decoration: InputDecoration(
+                          labelText: _t('Height (feet)', 'উচ্চতা (ফুট)'),
+                          prefixIcon: const Icon(Icons.height_rounded),
                         ),
                       ),
                     ),
@@ -655,8 +878,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         controller: _heightInchesController,
                         keyboardType: TextInputType.number,
                         onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          labelText: 'Inches',
+                        decoration: InputDecoration(
+                          labelText: _t('Inches', 'ইঞ্চি'),
                           hintText: '0–11',
                         ),
                       ),
@@ -664,46 +887,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _waterGlassesController,
-                        keyboardType: TextInputType.number,
-                        onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          labelText: 'Water glasses/day',
-                          prefixIcon: Icon(Icons.water_drop_outlined),
-                        ),
-                      ),
+                TextField(
+                  controller: _waterGlassesController,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: _t(
+                      'Daily water glasses',
+                      'প্রতিদিন পানির গ্লাস সংখ্যা',
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        initialValue: _waterGlassMl,
-                        decoration: const InputDecoration(
-                          labelText: 'Glass size',
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 200, child: Text('200 ml')),
-                          DropdownMenuItem(value: 250, child: Text('250 ml')),
-                          DropdownMenuItem(value: 300, child: Text('300 ml')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _waterGlassMl = value);
-                          }
-                        },
-                      ),
-                    ),
+                    hintText: _t('For example 8', 'যেমন ৮'),
+                    prefixIcon: const Icon(Icons.water_drop_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  initialValue: _waterGlassMl,
+                  decoration: InputDecoration(
+                    labelText: _t('Glass size', 'প্রতি গ্লাসের পরিমাণ'),
+                    prefixIcon: const Icon(Icons.local_drink_outlined),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 200, child: Text('200 ml')),
+                    DropdownMenuItem(value: 250, child: Text('250 ml')),
+                    DropdownMenuItem(value: 300, child: Text('300 ml')),
                   ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _waterGlassMl = value);
+                    }
+                  },
                 ),
                 const SizedBox(height: 14),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0EFFF),
+                    color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -711,20 +931,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: [
                       Text(
                         bmi == null
-                            ? 'BMI preview: add weight and height'
-                            : 'BMI preview: ${bmi.toStringAsFixed(1)}',
+                            ? _t(
+                                'BMI preview: add weight and height',
+                                'BMI প্রিভিউ: ওজন ও উচ্চতা দিন',
+                              )
+                            : _t(
+                                'BMI preview: ${bmi.toStringAsFixed(1)}',
+                                'BMI প্রিভিউ: ${bmi.toStringAsFixed(1)}',
+                              ),
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                       const SizedBox(height: 5),
-                      const Text(
-                        'Source: WHO BMI formula. Screening information only; not a diagnosis.',
-                        style: TextStyle(fontSize: 12.5, height: 1.35),
+                      Text(
+                        _t(
+                          'Source: WHO BMI formula. Screening information only; not a diagnosis.',
+                          'উৎস: WHO BMI সূত্র। এটি শুধু স্ক্রিনিং তথ্য; রোগ নির্ণয় নয়।',
+                        ),
+                        style: const TextStyle(fontSize: 12.5, height: 1.35),
                       ),
                       const SizedBox(height: 10),
                       Text(
                         waterMl == null
-                            ? 'Current fluid intake: add glasses and glass size'
-                            : 'Current fluid intake: ${(waterMl / 1000).toStringAsFixed(2)} L/day',
+                            ? _t(
+                                'Current fluid intake: add glasses and glass size',
+                                'বর্তমান পানি গ্রহণ: গ্লাস সংখ্যা ও পরিমাণ দিন',
+                              )
+                            : _t(
+                                'Current fluid intake: ${(waterMl / 1000).toStringAsFixed(2)} L/day',
+                                'বর্তমান পানি গ্রহণ: ${(waterMl / 1000).toStringAsFixed(2)} লিটার/দিন',
+                              ),
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ],
@@ -734,10 +969,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 TextField(
                   controller: _timezoneController,
                   maxLength: 60,
-                  decoration: const InputDecoration(
-                    labelText: 'Timezone',
+                  decoration: InputDecoration(
+                    labelText: _t('Timezone', 'টাইমজোন'),
                     hintText: 'Asia/Dhaka',
-                    prefixIcon: Icon(Icons.public_rounded),
+                    prefixIcon: const Icon(Icons.public_rounded),
                   ),
                 ),
               ],
@@ -754,8 +989,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         _introCard(
           icon: Icons.bedtime_outlined,
-          title: 'Your usual routine',
-          text: 'A short baseline helps MindPulse avoid generic advice.',
+          title: _t('Your usual routine', 'আপনার সাধারণ রুটিন'),
+          text: _t(
+            'A short baseline helps MindPulse avoid generic advice.',
+            'সংক্ষিপ্ত কিছু তথ্য MindPulse-কে সাধারণ ধরনের পরামর্শ এড়িয়ে চলতে সাহায্য করে।',
+          ),
         ),
         const SizedBox(height: 14),
         Card(
@@ -765,7 +1003,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Typical sleep: ${_typicalSleepHours.toStringAsFixed(1)} hours',
+                  _t(
+                    'Typical sleep: ${_typicalSleepHours.toStringAsFixed(1)} hours',
+                    'সাধারণ ঘুম: ${_typicalSleepHours.toStringAsFixed(1)} ঘণ্টা',
+                  ),
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
                 Slider(
@@ -773,29 +1014,44 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   min: 3,
                   max: 14,
                   divisions: 22,
-                  label: '${_typicalSleepHours.toStringAsFixed(1)} hours',
+                  label: _t(
+                    '${_typicalSleepHours.toStringAsFixed(1)} hours',
+                    '${_typicalSleepHours.toStringAsFixed(1)} ঘণ্টা',
+                  ),
                   onChanged: (value) =>
                       setState(() => _typicalSleepHours = value),
                 ),
                 const Divider(height: 28),
                 DropdownButtonFormField<String>(
                   initialValue: _userType,
-                  decoration: const InputDecoration(
-                    labelText: 'Work or study pattern',
-                    prefixIcon: Icon(Icons.work_outline),
+                  decoration: InputDecoration(
+                    labelText: _t(
+                      'Work or study pattern',
+                      'কাজ বা পড়াশোনার ধরন',
+                    ),
+                    prefixIcon: const Icon(Icons.work_outline),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('Select one')),
-                    DropdownMenuItem(value: 'student', child: Text('Student')),
+                  items: [
+                    DropdownMenuItem(
+                      value: '',
+                      child: Text(_t('Select one', 'একটি নির্বাচন করুন')),
+                    ),
+                    DropdownMenuItem(
+                      value: 'student',
+                      child: Text(_t('Student', 'শিক্ষার্থী')),
+                    ),
                     DropdownMenuItem(
                       value: 'employee',
-                      child: Text('Employee'),
+                      child: Text(_t('Employee', 'চাকরিজীবী')),
                     ),
                     DropdownMenuItem(
                       value: 'self_employed',
-                      child: Text('Self-employed'),
+                      child: Text(_t('Self-employed', 'স্বনিযুক্ত')),
                     ),
-                    DropdownMenuItem(value: 'other', child: Text('Other')),
+                    DropdownMenuItem(
+                      value: 'other',
+                      child: Text(_t('Other', 'অন্যান্য')),
+                    ),
                   ],
                   onChanged: (value) => setState(() => _userType = value ?? ''),
                 ),
@@ -803,47 +1059,60 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 TextField(
                   controller: _occupationController,
                   maxLength: 120,
-                  decoration: const InputDecoration(
-                    labelText: 'Occupation or study area (optional)',
-                    prefixIcon: Icon(Icons.badge_outlined),
+                  decoration: InputDecoration(
+                    labelText: _t(
+                      'Occupation or study area (optional)',
+                      'পেশা বা পড়াশোনার বিষয় (ঐচ্ছিক)',
+                    ),
+                    prefixIcon: const Icon(Icons.badge_outlined),
                   ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _activityPattern,
-                  decoration: const InputDecoration(
-                    labelText: 'Usual activity level',
-                    prefixIcon: Icon(Icons.directions_walk_outlined),
+                  decoration: InputDecoration(
+                    labelText: _t(
+                      'Usual activity level',
+                      'সাধারণ কার্যক্রমের মাত্রা',
+                    ),
+                    prefixIcon: const Icon(Icons.directions_walk_outlined),
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: 'mostly_sitting',
-                      child: Text('Mostly sitting'),
+                      child: Text(
+                        _t('Mostly sitting', 'বেশিরভাগ সময় বসে থাকা'),
+                      ),
                     ),
                     DropdownMenuItem(
                       value: 'lightly_active',
-                      child: Text('Lightly active'),
+                      child: Text(_t('Lightly active', 'হালকা সক্রিয়')),
                     ),
                     DropdownMenuItem(
                       value: 'moderately_active',
-                      child: Text('Moderately active'),
+                      child: Text(_t('Moderately active', 'মাঝারি সক্রিয়')),
                     ),
                     DropdownMenuItem(
                       value: 'very_active',
-                      child: Text('Very active'),
+                      child: Text(_t('Very active', 'খুব সক্রিয়')),
                     ),
                   ],
                   onChanged: (value) {
-                    if (value != null) setState(() => _activityPattern = value);
+                    if (value != null) {
+                      setState(() => _activityPattern = value);
+                    }
                   },
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _wellnessGoalController,
                   maxLength: 150,
-                  decoration: const InputDecoration(
-                    labelText: 'Main wellness goal (optional)',
-                    prefixIcon: Icon(Icons.flag_outlined),
+                  decoration: InputDecoration(
+                    labelText: _t(
+                      'Main wellness goal (optional)',
+                      'প্রধান ওয়েলনেস লক্ষ্য (ঐচ্ছিক)',
+                    ),
+                    prefixIcon: const Icon(Icons.flag_outlined),
                   ),
                 ),
               ],
@@ -862,9 +1131,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         _introCard(
           icon: Icons.self_improvement_outlined,
-          title: 'Religion and reminders',
-          text:
-              'This controls which faith content appears. MindPulse never shows Muslim prayer content to non-Muslim profiles.',
+          title: _t('Religion and reminders', 'ধর্ম ও রিমাইন্ডার'),
+          text: _t(
+            'This controls which faith content appears. MindPulse never shows Muslim prayer content to non-Muslim profiles.',
+            'এটি কোন ধর্মীয় তথ্য দেখানো হবে তা নিয়ন্ত্রণ করে। অমুসলিম প্রোফাইলে MindPulse কখনো মুসলিম নামাজের তথ্য দেখাবে না।',
+          ),
         ),
         const SizedBox(height: 14),
         Card(
@@ -872,37 +1143,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             padding: const EdgeInsets.all(17),
             child: Column(
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: _religion,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Religion',
-                    prefixIcon: Icon(Icons.account_balance_outlined),
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _showReligionPicker,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: _t('Religion', 'ধর্ম'),
+                      prefixIcon: const Icon(Icons.account_balance_outlined),
+                      suffixIcon: const Icon(Icons.search_rounded),
+                    ),
+                    child: Text(_religionLabels[_religion] ?? _religion),
                   ),
-                  items: _religionLabels.entries
-                      .map(
-                        (entry) => DropdownMenuItem<String>(
-                          value: entry.key,
-                          child: Text(entry.value),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() {
-                      _religion = value;
-                      if (value != 'islam') _prayerAlarmEnabled = false;
-                    });
-                  },
                 ),
                 if (other) ...[
                   const SizedBox(height: 12),
                   TextField(
                     controller: _otherReligionController,
                     maxLength: 120,
-                    decoration: const InputDecoration(
-                      labelText: 'Write religion name',
-                      prefixIcon: Icon(Icons.edit_outlined),
+                    decoration: InputDecoration(
+                      labelText: _t('Write religion name', 'ধর্মের নাম লিখুন'),
+                      prefixIcon: const Icon(Icons.edit_outlined),
                     ),
                   ),
                 ],
@@ -913,22 +1173,145 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     value: _prayerAlarmEnabled,
                     onChanged: (value) =>
                         setState(() => _prayerAlarmEnabled = value),
-                    title: const Text('Prayer alarm চালু করবেন?'),
-                    subtitle: const Text(
-                      'Yes: alarms will sound. No: alarms stay off, but prayer times and settings remain visible.',
+                    title: Text(
+                      _t(
+                        'Turn on prayer alarms?',
+                        'নামাজের অ্যালার্ম চালু করবেন?',
+                      ),
+                    ),
+                    subtitle: Text(
+                      _t(
+                        'Yes: alarms will sound. No: alarms stay off, but prayer times and settings remain visible.',
+                        'হ্যাঁ: অ্যালার্ম বাজবে। না: অ্যালার্ম বন্ধ থাকবে, তবে নামাজের সময় ও সেটিংস দেখা যাবে।',
+                      ),
                     ),
                   )
-                else
+                else if (_supportsManualReminder) ...[
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0EFFF),
+                      color: Theme.of(context).colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Text(
-                      'No Muslim prayer time, mosque, jamaat or Islamic alarm will be shown. Only reminders you create manually will appear.',
-                      style: TextStyle(height: 1.4),
+                    child: Text(
+                      _t(
+                        'Muslim prayer time, mosque, jamaat and Islamic alarms stay hidden. You can create only your own manual reminder.',
+                        'মুসলিম নামাজের সময়, মসজিদ, জামাত ও ইসলামিক অ্যালার্ম দেখানো হবে না। আপনি শুধু নিজের ম্যানুয়াল রিমাইন্ডার তৈরি করতে পারবেন।',
+                      ),
+                      style: const TextStyle(height: 1.4),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: _manualReminderRequested,
+                    onChanged: (value) =>
+                        setState(() => _manualReminderRequested = value),
+                    title: Text(
+                      _t(
+                        'Create a manual prayer or spiritual reminder?',
+                        'ম্যানুয়াল প্রার্থনা বা আধ্যাত্মিক রিমাইন্ডার তৈরি করবেন?',
+                      ),
+                    ),
+                    subtitle: Text(
+                      _t(
+                        'Only the reminder you enter will appear in your dashboard.',
+                        'আপনি যে রিমাইন্ডার লিখবেন, ড্যাশবোর্ডে শুধু সেটিই দেখা যাবে।',
+                      ),
+                    ),
+                  ),
+                  if (_manualReminderRequested) ...[
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _manualReminderTitleController,
+                      maxLength: 80,
+                      decoration: InputDecoration(
+                        labelText: _t('Reminder name', 'রিমাইন্ডারের নাম'),
+                        hintText: _t('Evening prayer', 'সন্ধ্যার প্রার্থনা'),
+                        prefixIcon: const Icon(
+                          Icons.edit_notifications_outlined,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.schedule_rounded),
+                      title: Text(_t('Reminder time', 'রিমাইন্ডারের সময়')),
+                      subtitle: Text(_manualReminderTime.format(context)),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _pickManualReminderTime,
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        _t('Repeat days', 'যে দিনগুলোতে বাজবে'),
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 7,
+                      children:
+                          const <MapEntry<int, String>>[
+                            MapEntry<int, String>(1, 'M'),
+                            MapEntry<int, String>(2, 'T'),
+                            MapEntry<int, String>(3, 'W'),
+                            MapEntry<int, String>(4, 'T'),
+                            MapEntry<int, String>(5, 'F'),
+                            MapEntry<int, String>(6, 'S'),
+                            MapEntry<int, String>(7, 'S'),
+                          ].map((entry) {
+                            final selected = _manualReminderWeekdays.contains(
+                              entry.key,
+                            );
+                            return FilterChip(
+                              label: Text(entry.value),
+                              selected: selected,
+                              onSelected: (value) {
+                                setState(() {
+                                  if (value) {
+                                    _manualReminderWeekdays.add(entry.key);
+                                  } else {
+                                    _manualReminderWeekdays.remove(entry.key);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _manualReminderAlarmEnabled,
+                      onChanged: (value) =>
+                          setState(() => _manualReminderAlarmEnabled = value),
+                      title: Text(_t('Alarm sound', 'অ্যালার্মের শব্দ')),
+                      subtitle: Text(
+                        _t(
+                          'Turn this off to save the reminder without sound.',
+                          'শব্দ ছাড়া রিমাইন্ডার রাখতে এটি বন্ধ করুন।',
+                        ),
+                      ),
+                    ),
+                  ],
+                ] else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      _t(
+                        'No religious reminder will be created automatically.',
+                        'কোনো ধর্মীয় রিমাইন্ডার স্বয়ংক্রিয়ভাবে তৈরি হবে না।',
+                      ),
+                      style: const TextStyle(height: 1.4),
                     ),
                   ),
               ],
@@ -945,8 +1328,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         _introCard(
           icon: Icons.tune_rounded,
-          title: 'Choose your experience',
-          text: 'These preferences can be changed later.',
+          title: _t('Choose your experience', 'আপনার পছন্দ নির্বাচন করুন'),
+          text: _t(
+            'These preferences can be changed later.',
+            'এই পছন্দগুলো পরে পরিবর্তন করা যাবে।',
+          ),
         ),
         const SizedBox(height: 14),
         Card(
@@ -956,35 +1342,49 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: _languageCode,
-                  decoration: const InputDecoration(
-                    labelText: 'Preferred language',
-                    prefixIcon: Icon(Icons.language_rounded),
+                  decoration: InputDecoration(
+                    labelText: _t('Preferred language', 'পছন্দের ভাষা'),
+                    prefixIcon: const Icon(Icons.language_rounded),
                   ),
                   items: const [
                     DropdownMenuItem(value: 'en', child: Text('English')),
                     DropdownMenuItem(value: 'bn', child: Text('বাংলা')),
                   ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => _languageCode = value);
+                  onChanged: (value) async {
+                    if (value == null) return;
+                    setState(() => _languageCode = value);
+                    await AppPreferencesController.instance.apply(
+                      languageCode: value,
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _themeMode,
-                  decoration: const InputDecoration(
-                    labelText: 'Theme',
-                    prefixIcon: Icon(Icons.contrast_rounded),
+                  decoration: InputDecoration(
+                    labelText: _t('Theme', 'থিম'),
+                    prefixIcon: const Icon(Icons.contrast_rounded),
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: 'system',
-                      child: Text('System default'),
+                      child: Text(_t('System default', 'ফোনের থিম')),
                     ),
-                    DropdownMenuItem(value: 'light', child: Text('Light')),
-                    DropdownMenuItem(value: 'dark', child: Text('Dark')),
+                    DropdownMenuItem(
+                      value: 'light',
+                      child: Text(_t('Light', 'লাইট')),
+                    ),
+                    DropdownMenuItem(
+                      value: 'dark',
+                      child: Text(_t('Dark', 'ডার্ক')),
+                    ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => _themeMode = value);
+                  onChanged: (value) async {
+                    if (value == null) return;
+                    setState(() => _themeMode = value);
+                    await AppPreferencesController.instance.apply(
+                      themeMode: value,
+                    );
                   },
                 ),
                 const SizedBox(height: 8),
@@ -993,9 +1393,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   value: _aiAnalysisEnabled,
                   onChanged: (value) =>
                       setState(() => _aiAnalysisEnabled = value),
-                  title: const Text('AI wellness analysis'),
-                  subtitle: const Text(
-                    'Generate personalized wellness insights.',
+                  title: Text(
+                    _t('AI wellness analysis', 'AI ওয়েলনেস বিশ্লেষণ'),
+                  ),
+                  subtitle: Text(
+                    _t(
+                      'Generate personalized wellness insights.',
+                      'ব্যক্তিগত ওয়েলনেস ধারণা তৈরি করুন।',
+                    ),
                   ),
                 ),
                 const Divider(height: 1),
@@ -1004,8 +1409,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   value: _journalAnalysisEnabled,
                   onChanged: (value) =>
                       setState(() => _journalAnalysisEnabled = value),
-                  title: const Text('Journal analysis'),
-                  subtitle: const Text('Allow AI-supported journal insights.'),
+                  title: Text(_t('Journal analysis', 'জার্নাল বিশ্লেষণ')),
+                  subtitle: Text(
+                    _t(
+                      'Allow AI-supported journal insights.',
+                      'AI-সহায়িত জার্নাল ধারণা অনুমোদন করুন।',
+                    ),
+                  ),
                 ),
                 const Divider(height: 1),
                 SwitchListTile.adaptive(
@@ -1013,7 +1423,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   value: _analyticsEnabled,
                   onChanged: (value) =>
                       setState(() => _analyticsEnabled = value),
-                  title: const Text('Anonymous analytics'),
+                  title: Text(
+                    _t('Anonymous analytics', 'নামবিহীন অ্যানালিটিক্স'),
+                  ),
                 ),
                 const Divider(height: 1),
                 SwitchListTile.adaptive(
@@ -1021,8 +1433,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   value: _notificationsEnabled,
                   onChanged: (value) =>
                       setState(() => _notificationsEnabled = value),
-                  title: const Text('Notifications'),
-                  subtitle: const Text('Receive reminders and reports.'),
+                  title: Text(_t('Notifications', 'নোটিফিকেশন')),
+                  subtitle: Text(
+                    _t(
+                      'Receive reminders and reports.',
+                      'রিমাইন্ডার ও রিপোর্ট গ্রহণ করুন।',
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1038,38 +1455,50 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         _introCard(
           icon: Icons.admin_panel_settings_outlined,
-          title: 'Choose permission setup',
-          text:
-              'Permissions and feature activation are separate. Enabling permissions never turns on prayer alarms by itself.',
+          title: _t('Choose permission setup', 'অনুমতির ধরন নির্বাচন করুন'),
+          text: _t(
+            'Permissions and feature activation are separate. Enabling permissions never turns on prayer alarms by itself.',
+            'অনুমতি ও ফিচার চালু করা আলাদা বিষয়। অনুমতি দিলেই নামাজ বা অন্য অ্যালার্ম নিজে থেকে চালু হবে না।',
+          ),
         ),
         const SizedBox(height: 14),
         _permissionOption(
           value: 'enable_all',
-          title: 'Enable all needed permissions',
-          subtitle:
-              'Guided requests for notifications, activity, location and Usage Access. Exact alarm is requested only for an enabled alarm feature.',
+          title: _t('Enable all needed permissions', 'প্রয়োজনীয় সব অনুমতি দিন'),
+          subtitle: _t(
+            'Guided requests for notifications, activity and Usage Access. Location is requested only for Islamic prayer times. Exact alarm is requested only for an enabled alarm.',
+            'নোটিফিকেশন, কার্যক্রম ও Usage Access-এর ধাপ দেখানো হবে। লোকেশন শুধু ইসলামিক নামাজের সময়ের জন্য এবং Exact Alarm শুধু চালু অ্যালার্মের জন্য চাওয়া হবে।',
+          ),
           icon: Icons.done_all_rounded,
           onTap: _enableAllNeededPermissions,
         ),
         const SizedBox(height: 10),
         _permissionOption(
           value: 'choose',
-          title: 'Choose permissions',
-          subtitle: 'Open the detailed MindPulse permission controls.',
+          title: _t('Choose permissions', 'অনুমতি বেছে নিন'),
+          subtitle: _t(
+            'Open the detailed MindPulse permission controls.',
+            'MindPulse-এর বিস্তারিত অনুমতি নিয়ন্ত্রণ খুলুন।',
+          ),
           icon: Icons.tune_rounded,
           onTap: _choosePermissions,
         ),
         const SizedBox(height: 10),
         _permissionOption(
           value: 'continue_without',
-          title: 'Continue without permissions',
-          subtitle:
-              'Core account features remain available. You can enable access later.',
+          title: _t('Continue without permissions', 'অনুমতি ছাড়াই এগিয়ে যান'),
+          subtitle: _t(
+            'Core account features remain available. You can enable access later.',
+            'মূল অ্যাকাউন্ট ফিচারগুলো থাকবে। পরে অনুমতি দেওয়া যাবে।',
+          ),
           icon: Icons.arrow_forward_rounded,
           onTap: () async {
             setState(() {
               _permissionMode = 'continue_without';
-              _permissionMessage = 'No system permission was requested.';
+              _permissionMessage = _t(
+                'No system permission was requested. A new manual reminder will be saved with its alarm off until permission is enabled later.',
+                'কোনো সিস্টেম অনুমতি চাওয়া হয়নি। নতুন ম্যানুয়াল রিমাইন্ডার সংরক্ষিত হবে, তবে পরে অনুমতি না দেওয়া পর্যন্ত অ্যালার্ম বন্ধ থাকবে।',
+              );
             });
           },
         ),
@@ -1082,7 +1511,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0EFFF),
+              color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Text(_permissionMessage!),
@@ -1144,9 +1573,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         _introCard(
           icon: Icons.verified_user_outlined,
-          title: 'Your privacy matters',
-          text:
-              'MindPulse provides wellness support and does not replace professional medical care.',
+          title: _t('Your privacy matters', 'আপনার গোপনীয়তা গুরুত্বপূর্ণ'),
+          text: _t(
+            'MindPulse provides wellness support and does not replace professional medical care.',
+            'MindPulse ওয়েলনেস সহায়তা দেয়; এটি পেশাদার চিকিৎসার বিকল্প নয়।',
+          ),
         ),
         const SizedBox(height: 14),
         Card(
@@ -1156,8 +1587,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 value: _termsAccepted,
                 onChanged: (value) =>
                     setState(() => _termsAccepted = value == true),
-                title: const Text('I accept the Terms of Service'),
-                subtitle: const Text('Required'),
+                title: Text(
+                  _t(
+                    'I accept the Terms of Service',
+                    'আমি সেবার শর্তাবলি গ্রহণ করছি',
+                  ),
+                ),
+                subtitle: Text(_t('Required', 'আবশ্যক')),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
               const Divider(height: 1),
@@ -1165,8 +1601,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 value: _privacyAccepted,
                 onChanged: (value) =>
                     setState(() => _privacyAccepted = value == true),
-                title: const Text('I accept the Privacy Policy'),
-                subtitle: const Text('Required'),
+                title: Text(
+                  _t(
+                    'I accept the Privacy Policy',
+                    'আমি গোপনীয়তা নীতি গ্রহণ করছি',
+                  ),
+                ),
+                subtitle: Text(_t('Required', 'আবশ্যক')),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
               const Divider(height: 1),
@@ -1174,9 +1615,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 value: _wellnessDataAccepted,
                 onChanged: (value) =>
                     setState(() => _wellnessDataAccepted = value == true),
-                title: const Text('I consent to wellness data processing'),
-                subtitle: const Text(
-                  'Required for personalized wellness features',
+                title: Text(
+                  _t(
+                    'I consent to wellness data processing',
+                    'আমি ওয়েলনেস ডেটা প্রক্রিয়াকরণে সম্মতি দিচ্ছি',
+                  ),
+                ),
+                subtitle: Text(
+                  _t(
+                    'Required for personalized wellness features',
+                    'ব্যক্তিগত ওয়েলনেস ফিচারের জন্য আবশ্যক',
+                  ),
                 ),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
@@ -1211,8 +1660,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.surface,
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1241,7 +1690,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Expanded(
               child: OutlinedButton(
                 onPressed: _saving ? null : _previousStep,
-                child: const Text('Back'),
+                child: Text(_t('Back', 'পেছনে')),
               ),
             ),
           if (_currentStep > 0) const SizedBox(width: 12),
@@ -1255,7 +1704,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       height: 22,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(last ? 'Complete setup' : 'Continue'),
+                  : Text(
+                      last
+                          ? _t('Complete setup', 'সেটআপ সম্পন্ন করুন')
+                          : _t('Continue', 'পরবর্তী'),
+                    ),
             ),
           ),
         ],

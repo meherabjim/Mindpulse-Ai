@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/settings/app_preferences_controller.dart';
 import '../services/faith_profile_service.dart';
 import '../services/manual_faith_reminder_service.dart';
 
@@ -64,8 +65,13 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
     if (existing == null &&
         _reminders.length >= ManualFaithReminderService.maximumReminders) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('A maximum of 10 manual reminders is supported.'),
+        SnackBar(
+          content: Text(
+            _t(
+              'A maximum of 10 manual reminders is supported.',
+              'সর্বোচ্চ ১০টি ম্যানুয়াল রিমাইন্ডার রাখা যাবে।',
+            ),
+          ),
         ),
       );
       return;
@@ -89,6 +95,10 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
     await _save(_reminders.where((item) => item.id != reminder.id).toList());
   }
 
+  String _t(String english, String bangla) {
+    return AppPreferencesController.instance.text(english, bangla);
+  }
+
   String _time(ManualFaithReminder reminder) {
     return TimeOfDay(
       hour: reminder.hour,
@@ -97,7 +107,9 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
   }
 
   String _days(ManualFaithReminder reminder) {
-    if (reminder.weekdays.length == 7) return 'Every day';
+    if (reminder.weekdays.length == 7) {
+      return _t('Every day', 'প্রতিদিন');
+    }
     const names = <int, String>{
       1: 'Mon',
       2: 'Tue',
@@ -116,12 +128,11 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
         widget.faithProfile.religion == 'no_religion' ||
         widget.faithProfile.religion == 'prefer_not_to_say';
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FC),
       appBar: AppBar(
-        title: const Text('Manual reminders'),
+        title: Text(_t('Manual reminders', 'ম্যানুয়াল রিমাইন্ডার')),
         actions: [
           IconButton(
-            tooltip: 'Add reminder',
+            tooltip: _t('Add reminder', 'রিমাইন্ডার যোগ করুন'),
             onPressed: _saving ? null : () => _openEditor(),
             icon: const Icon(Icons.add_alarm_rounded),
           ),
@@ -137,7 +148,7 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0EFFF),
+                      color: Theme.of(context).colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: Column(
@@ -145,16 +156,22 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                       children: [
                         if (!hiddenFaith)
                           Text(
-                            'Religion: ${widget.faithProfile.religionLabel}',
+                            _t(
+                              'Religion: ${widget.faithProfile.religionLabel}',
+                              'ধর্ম: ${widget.faithProfile.religionLabel}',
+                            ),
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                         if (!hiddenFaith) const SizedBox(height: 7),
-                        const Text(
-                          'Only reminders you create manually are shown here. Muslim prayer times, mosque and jamaat content are hidden.',
-                          style: TextStyle(height: 1.4),
+                        Text(
+                          _t(
+                            'Only reminders you create manually are shown here. Muslim prayer times, mosque and jamaat content are hidden.',
+                            'এখানে শুধু আপনার তৈরি ম্যানুয়াল রিমাইন্ডার দেখা যাবে। মুসলিম নামাজের সময়, মসজিদ ও জামাতের তথ্য লুকানো থাকবে।',
+                          ),
+                          style: const TextStyle(height: 1.4),
                         ),
                       ],
                     ),
@@ -172,23 +189,34 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                           children: [
                             const Icon(Icons.alarm_add_outlined, size: 52),
                             const SizedBox(height: 12),
-                            const Text(
-                              'No manual reminder yet',
-                              style: TextStyle(
+                            Text(
+                              _t(
+                                'No manual reminder yet',
+                                'এখনও কোনো ম্যানুয়াল রিমাইন্ডার নেই',
+                              ),
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
-                              'Add a personal prayer, spiritual practice or general reminder.',
+                            Text(
+                              _t(
+                                'Add a personal prayer, spiritual practice or general reminder.',
+                                'নিজের প্রার্থনা, আধ্যাত্মিক চর্চা বা সাধারণ রিমাইন্ডার যোগ করুন।',
+                              ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 14),
                             FilledButton.icon(
                               onPressed: _saving ? null : () => _openEditor(),
                               icon: const Icon(Icons.add_alarm_rounded),
-                              label: const Text('Add manual reminder'),
+                              label: Text(
+                                _t(
+                                  'Add manual reminder',
+                                  'ম্যানুয়াল রিমাইন্ডার যোগ করুন',
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -233,14 +261,14 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                                   if (value == 'edit') _openEditor(reminder);
                                   if (value == 'delete') _delete(reminder);
                                 },
-                                itemBuilder: (_) => const [
+                                itemBuilder: (_) => [
                                   PopupMenuItem(
                                     value: 'edit',
-                                    child: Text('Edit'),
+                                    child: Text(_t('Edit', 'সম্পাদনা')),
                                   ),
                                   PopupMenuItem(
                                     value: 'delete',
-                                    child: Text('Delete'),
+                                    child: Text(_t('Delete', 'মুছুন')),
                                   ),
                                 ],
                               ),
@@ -265,6 +293,10 @@ class _ReminderEditor extends StatefulWidget {
 }
 
 class _ReminderEditorState extends State<_ReminderEditor> {
+  String _t(String english, String bangla) {
+    return AppPreferencesController.instance.text(english, bangla);
+  }
+
   late final TextEditingController _titleController;
   late TimeOfDay _time;
   late Set<int> _weekdays;
@@ -323,7 +355,9 @@ class _ReminderEditorState extends State<_ReminderEditor> {
     };
     return AlertDialog(
       title: Text(
-        widget.reminder == null ? 'Add manual reminder' : 'Edit reminder',
+        widget.reminder == null
+            ? _t('Add manual reminder', 'ম্যানুয়াল রিমাইন্ডার যোগ করুন')
+            : _t('Edit reminder', 'রিমাইন্ডার সম্পাদনা করুন'),
       ),
       content: SingleChildScrollView(
         child: Column(
@@ -333,21 +367,24 @@ class _ReminderEditorState extends State<_ReminderEditor> {
             TextField(
               controller: _titleController,
               maxLength: 80,
-              decoration: const InputDecoration(
-                labelText: 'Reminder name',
-                hintText: 'Evening prayer',
+              decoration: InputDecoration(
+                labelText: _t('Reminder name', 'রিমাইন্ডারের নাম'),
+                hintText: _t('Evening prayer', 'সন্ধ্যার প্রার্থনা'),
               ),
             ),
             const SizedBox(height: 8),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.schedule_rounded),
-              title: const Text('Time'),
+              title: Text(_t('Time', 'সময়')),
               subtitle: Text(_time.format(context)),
               onTap: _pickTime,
             ),
             const SizedBox(height: 8),
-            const Text('Days', style: TextStyle(fontWeight: FontWeight.w900)),
+            Text(
+              _t('Days', 'দিন'),
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 7,
@@ -374,9 +411,12 @@ class _ReminderEditorState extends State<_ReminderEditor> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(_t('Cancel', 'বাতিল')),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Save')),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(_t('Save', 'সংরক্ষণ করুন')),
+        ),
       ],
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../core/settings/app_preferences_controller.dart';
 import '../../../core/auth/authenticated_http_client.dart';
 
 class FaithProfile {
@@ -39,17 +40,29 @@ class FaithProfileService {
   }
 
   String _label(String value) {
-    const labels = <String, String>{
-      'islam': 'Islam',
-      'hinduism': 'Hinduism',
-      'christianity': 'Christianity',
-      'buddhism': 'Buddhism',
-      'judaism': 'Judaism',
-      'sikhism': 'Sikhism',
-      'no_religion': 'No religion',
-      'prefer_not_to_say': 'Prefer not to say',
-    };
-    return labels[value] ?? 'Other';
+    final bangla = AppPreferencesController.instance.isBangla;
+    final labels = bangla
+        ? const <String, String>{
+            'islam': 'ইসলাম',
+            'hinduism': 'হিন্দুধর্ম',
+            'christianity': 'খ্রিষ্টধর্ম',
+            'buddhism': 'বৌদ্ধধর্ম',
+            'judaism': 'ইহুদি ধর্ম',
+            'sikhism': 'শিখধর্ম',
+            'no_religion': 'কোনো ধর্ম নেই',
+            'prefer_not_to_say': 'বলতে চাই না',
+          }
+        : const <String, String>{
+            'islam': 'Islam',
+            'hinduism': 'Hinduism',
+            'christianity': 'Christianity',
+            'buddhism': 'Buddhism',
+            'judaism': 'Judaism',
+            'sikhism': 'Sikhism',
+            'no_religion': 'No religion',
+            'prefer_not_to_say': 'Prefer not to say',
+          };
+    return labels[value] ?? (bangla ? 'অন্যান্য' : 'Other');
   }
 
   Map<String, dynamic> _decode(String source) {

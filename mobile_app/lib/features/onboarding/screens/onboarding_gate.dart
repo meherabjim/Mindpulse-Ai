@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/settings/app_preferences_controller.dart';
 import '../../account/services/account_service.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../auth/services/auth_service.dart';
@@ -21,12 +22,30 @@ class _OnboardingGateState extends State<OnboardingGate> {
   @override
   void initState() {
     super.initState();
-    _statusFuture = _accountService.getOnboardingStatus();
+    _statusFuture = _loadStatusAndPreferences();
+  }
+
+  Future<Map<String, dynamic>> _loadStatusAndPreferences() async {
+    final results = await Future.wait<dynamic>([
+      _accountService.getOnboardingStatus(),
+      _accountService.getSettings(),
+    ]);
+
+    final status = _asMap(results[0]);
+    final settings = _asMap(results[1]);
+    final appSettings = _asMap(settings['app_settings']);
+
+    await AppPreferencesController.instance.apply(
+      languageCode: appSettings['language_code']?.toString(),
+      themeMode: appSettings['theme_mode']?.toString(),
+    );
+
+    return status;
   }
 
   void _retry() {
     setState(() {
-      _statusFuture = _accountService.getOnboardingStatus();
+      _statusFuture = _loadStatusAndPreferences();
     });
   }
 
@@ -41,6 +60,12 @@ class _OnboardingGateState extends State<OnboardingGate> {
     );
   }
 
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return <String, dynamic>{};
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
@@ -48,14 +73,13 @@ class _OnboardingGateState extends State<OnboardingGate> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            backgroundColor: Color(0xFFF7F7FC),
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasError) {
+          final bangla = AppPreferencesController.instance.isBangla;
           return Scaffold(
-            backgroundColor: const Color(0xFFF7F7FC),
             body: SafeArea(
               child: Center(
                 child: Padding(
@@ -69,10 +93,12 @@ class _OnboardingGateState extends State<OnboardingGate> {
                         color: Colors.grey,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Unable to check account setup.',
+                      Text(
+                        bangla
+                            ? 'অ্যাকাউন্ট সেটআপ যাচাই করা যাচ্ছে না।'
+                            : 'Unable to check account setup.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
                         ),
@@ -86,11 +112,11 @@ class _OnboardingGateState extends State<OnboardingGate> {
                       FilledButton.icon(
                         onPressed: _retry,
                         icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Retry'),
+                        label: Text(bangla ? 'আবার চেষ্টা করুন' : 'Retry'),
                       ),
                       TextButton(
                         onPressed: _logout,
-                        child: const Text('Logout'),
+                        child: Text(bangla ? 'লগআউট' : 'Logout'),
                       ),
                     ],
                   ),
