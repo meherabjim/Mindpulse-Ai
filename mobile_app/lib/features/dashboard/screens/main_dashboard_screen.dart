@@ -59,9 +59,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
       debugPrint('MindPulse: faith profile load failed: $error');
       if (!mounted) return;
       setState(() {
-        _faithProfile = const FaithProfile(
+        _faithProfile = FaithProfile(
           religion: 'prefer_not_to_say',
-          religionLabel: 'Prefer not to say',
+          religionLabel: _t('Prefer not to say', 'বলতে চাই না'),
           isIslam: false,
         );
         _faithLoading = false;
@@ -500,7 +500,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                   'আপনার ব্যক্তিগত ওয়েলনেস সহকারী',
                 ),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF74748A),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -522,8 +522,8 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
     final riskLabel = storedRisk.isNotEmpty
         ? storedRisk.toUpperCase()
         : _wellnessLoading
-        ? 'LOADING'
-        : 'NO DATA';
+        ? _t('LOADING', 'লোড হচ্ছে')
+        : _t('NO DATA', 'তথ্য নেই');
 
     final description = _wellnessLoading
         ? _t(
@@ -535,10 +535,10 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
             'No Wellness Scan has been completed today. Complete a new scan to create today’s score.',
             'আজ কোনো Wellness Scan সম্পন্ন হয়নি। আজকের স্কোর তৈরি করতে নতুন একটি scan সম্পন্ন করুন।',
           )
-        : 'Higher values indicate more strain. '
-              'Source: MindPulse Wellness Scan. '
-              'Informational only; not a WHO score '
-              'or medical diagnosis.';
+        : _t(
+            'Higher values indicate more strain. Source: MindPulse Wellness Scan. Informational only; not a WHO score or medical diagnosis.',
+            'বেশি স্কোর মানে বেশি মানসিক চাপের ইঙ্গিত। উৎস: MindPulse Wellness Scan। এটি শুধু তথ্যের জন্য; WHO স্কোর বা চিকিৎসা নির্ণয় নয়।',
+          );
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -564,7 +564,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
             children: [
               Expanded(
                 child: Text(
-                  _t('Today’s MindPulse strain', 'আজকের MindPulse strain'),
+                  _t('Today’s MindPulse strain', 'আজকের MindPulse চাপ'),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 19,
@@ -674,11 +674,11 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
 
               const SizedBox(width: 16),
 
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'MindPulse AI',
                       style: TextStyle(
                         color: Colors.white,
@@ -686,10 +686,16 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     Text(
-                      'Your AI wellness companion is ready.',
-                      style: TextStyle(color: Color(0xFFEDEBFF), height: 1.35),
+                      _t(
+                        'Your AI wellness companion is ready.',
+                        'আপনার AI ওয়েলনেস সহকারী প্রস্তুত।',
+                      ),
+                      style: const TextStyle(
+                        color: Color(0xFFEDEBFF),
+                        height: 1.35,
+                      ),
                     ),
                   ],
                 ),
@@ -716,51 +722,51 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
   }
 
   Widget _buildToolsGrid(BuildContext context) {
-    const List<_ToolData> tools = [
+    final List<_ToolData> tools = [
       _ToolData(
         icon: Icons.edit_note_rounded,
-        title: 'Journal',
-        subtitle: 'Reflect safely',
+        title: _t('Journal', 'জার্নাল'),
+        subtitle: _t('Reflect safely', 'নিরাপদে অনুভূতি লিখুন'),
       ),
       _ToolData(
         icon: Icons.monitor_heart_outlined,
-        title: 'Wellness Scan',
-        subtitle: 'Assess wellbeing',
+        title: _t('Wellness Scan', 'ওয়েলনেস স্ক্যান'),
+        subtitle: _t('Assess wellbeing', 'সুস্থতা যাচাই করুন'),
       ),
       _ToolData(
         icon: Icons.check_circle_outline_rounded,
-        title: 'Daily Check-in',
-        subtitle: 'Track your day',
+        title: _t('Daily Check-in', 'দৈনিক চেক-ইন'),
+        subtitle: _t('Track your day', 'আজকের দিন নথিভুক্ত করুন'),
       ),
       _ToolData(
         icon: Icons.bedtime_outlined,
-        title: 'Recovery',
-        subtitle: 'Restore energy',
+        title: _t('Recovery', 'পুনরুদ্ধার'),
+        subtitle: _t('Restore energy', 'শক্তি ফিরিয়ে আনুন'),
       ),
       _ToolData(
         icon: Icons.track_changes_rounded,
-        title: 'Habit Tracker',
-        subtitle: 'Build routines',
+        title: _t('Habit Tracker', 'অভ্যাস ট্র্যাকার'),
+        subtitle: _t('Build routines', 'নিয়মিত অভ্যাস গড়ুন'),
       ),
       _ToolData(
         icon: Icons.emoji_events_outlined,
-        title: 'Achievements',
-        subtitle: 'View badges',
+        title: _t('Achievements', 'অর্জন'),
+        subtitle: _t('View badges', 'ব্যাজ দেখুন'),
       ),
       _ToolData(
         icon: Icons.insights_rounded,
-        title: 'Weekly Report',
-        subtitle: 'View progress',
+        title: _t('Weekly Report', 'সাপ্তাহিক রিপোর্ট'),
+        subtitle: _t('View progress', 'অগ্রগতি দেখুন'),
       ),
       _ToolData(
         icon: Icons.phone_android_rounded,
-        title: 'Mindful Screen Time',
-        subtitle: 'Use phone mindfully',
+        title: _t('Mindful Screen Time', 'সচেতন স্ক্রিন টাইম'),
+        subtitle: _t('Use phone mindfully', 'সচেতনভাবে ফোন ব্যবহার করুন'),
       ),
       _ToolData(
         icon: Icons.notifications_active_outlined,
-        title: 'Smart Reminders',
-        subtitle: 'Gentle wellness reminders',
+        title: _t('Smart Reminders', 'স্মার্ট রিমাইন্ডার'),
+        subtitle: _t('Gentle wellness reminders', 'সহজ ওয়েলনেস রিমাইন্ডার'),
       ),
     ];
 
@@ -778,7 +784,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
         final tool = tools[index];
 
         return Material(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(26),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -787,7 +793,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
             onTap: () async {
               debugPrint('MindPulse: Tool tapped: ${tool.title}');
 
-              if (tool.title == 'Wellness Scan') {
+              if (index == 1) {
                 await Navigator.of(context).push<void>(
                   MaterialPageRoute<void>(
                     builder: (_) => const WellnessScanScreen(),
@@ -800,7 +806,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
 
                 return;
               }
-              if (tool.title == 'Smart Reminders') {
+              if (index == 8) {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const SmartReminderCenterScreen(),
@@ -810,7 +816,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                 return;
               }
 
-              if (tool.title == 'Mindful Screen Time') {
+              if (index == 7) {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const MindfulScreenTimeScreen(),
@@ -820,7 +826,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                 return;
               }
 
-              if (tool.title == 'Daily Check-in') {
+              if (index == 2) {
                 debugPrint('MindPulse: Opening DailyCheckinScreen');
 
                 Navigator.of(context).push(
@@ -832,7 +838,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                 return;
               }
 
-              if (tool.title == 'Journal') {
+              if (index == 0) {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const JournalScreen(),
@@ -842,7 +848,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                 return;
               }
 
-              if (tool.title == 'Recovery') {
+              if (index == 3) {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const RecoveryScreen(),
@@ -851,7 +857,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
 
                 return;
               }
-              if (tool.title == 'Weekly Report') {
+              if (index == 6) {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const WeeklyReportScreen(),
@@ -860,14 +866,14 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
 
                 return;
               }
-              if (tool.title == 'Habit Tracker') {
+              if (index == 4) {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(builder: (_) => const HabitScreen()),
                 );
 
                 return;
               }
-              if (tool.title == 'Achievements') {
+              if (index == 5) {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const AchievementsScreen(),
@@ -878,7 +884,12 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
               }
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('${tool.title} module will be connected next.'),
+                  content: Text(
+                    _t(
+                      '${tool.title} module will be connected next.',
+                      '${tool.title} মডিউলটি পরবর্তী ধাপে যুক্ত হবে।',
+                    ),
+                  ),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -889,7 +900,9 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: const Color(0xFFE5E4EE)),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -904,7 +917,9 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0EFFF),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Icon(
@@ -934,8 +949,10 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                                 tool.subtitle,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFF85859A),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                   fontSize: 12,
                                   height: 1.25,
                                 ),
@@ -954,7 +971,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0EFFF),
+                          color: Theme.of(context).colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Icon(
@@ -979,8 +996,8 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                         tool.subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF85859A),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12.5,
                           height: 1.2,
                         ),
@@ -1055,7 +1072,10 @@ class _NotificationBellState extends State<_NotificationBell> {
         IconButton.filledTonal(
           onPressed: _openNotifications,
           icon: const Icon(Icons.notifications_none_rounded),
-          tooltip: 'Notifications',
+          tooltip: AppPreferencesController.instance.text(
+            'Notifications',
+            'নোটিফিকেশন',
+          ),
         ),
         if (!_loading && _unreadCount > 0)
           Positioned(

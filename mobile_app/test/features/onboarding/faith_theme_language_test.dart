@@ -43,4 +43,22 @@ void main() {
     expect(restored.weekdays, <int>[1, 3, 5]);
     expect(restored.enabled, isTrue);
   });
+  test('Bangla and theme choices update independently', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final controller = AppPreferencesController.instance;
+    await controller.load();
+
+    await controller.apply(languageCode: 'bn', themeMode: 'light');
+    expect(controller.isBangla, isTrue);
+    expect(controller.themeMode, ThemeMode.light);
+
+    await controller.apply(themeMode: 'dark');
+    expect(controller.isBangla, isTrue);
+    expect(controller.themeMode, ThemeMode.dark);
+
+    await controller.apply(languageCode: 'en');
+    expect(controller.isBangla, isFalse);
+    expect(controller.themeMode, ThemeMode.dark);
+  });
 }

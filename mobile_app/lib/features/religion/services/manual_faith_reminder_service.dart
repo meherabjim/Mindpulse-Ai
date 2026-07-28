@@ -90,35 +90,43 @@ class ManualFaithReminderService {
     }
   }
 
-  Future<void> save(List<ManualFaithReminder> reminders) async {
+  Future<int> save(List<ManualFaithReminder> reminders) async {
+    final normalized = reminders.take(maximumReminders).toList();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _storageKey,
-      jsonEncode(reminders.map((item) => item.toJson()).toList()),
+      jsonEncode(normalized.map((item) => item.toJson()).toList()),
     );
-    await reschedule(reminders);
+    return reschedule(normalized);
   }
 
-  Future<void> reschedule(List<ManualFaithReminder> reminders) async {
+  Future<int> reschedule(List<ManualFaithReminder> reminders) async {
     await _bridge.cancelAll();
+
     final active = reminders
         .where((item) => item.enabled)
         .take(maximumReminders)
         .toList();
-    if (active.isEmpty) return;
+
+    if (active.isEmpty) return 0;
+
     await _bridge.requestNotificationPermission();
     await _bridge.requestExactAlarmPermission();
+
     final now = DateTime.now();
     final alarms = <Map<String, Object?>>[];
+
     for (var offset = 0; offset < _horizonDays; offset++) {
       final day = DateTime(
         now.year,
         now.month,
         now.day,
       ).add(Duration(days: offset));
+
       for (var index = 0; index < active.length; index++) {
         final reminder = active[index];
         if (!reminder.weekdays.contains(day.weekday)) continue;
+
         final trigger = DateTime(
           day.year,
           day.month,
@@ -126,24 +134,66 @@ class ManualFaithReminderService {
           reminder.hour,
           reminder.minute,
         );
+
         if (!trigger.isAfter(now.add(const Duration(seconds: 20)))) continue;
+
         final dateCode = (day.year * 10000) + (day.month * 100) + day.day;
-        alarms.add(<String, Object?>{
-          'id': (dateCode * 100) + 70 + index,
-          'triggerAtMillis': trigger.millisecondsSinceEpoch,
-          'title': reminder.title,
-          'message': 'Your manually scheduled reminder is due now.',
-          'voiceBn': '${reminder.title} সময় হয়েছে।',
-          'voiceEn': 'It is time for ${reminder.title}.',
-          'prayerBn': reminder.title,
-          'prayerEn': reminder.title,
-          'durationSeconds': 15,
-          'voiceRepeat': 1,
-          'prayerKey': 'manual_${reminder.id}',
-          'eventType': 'manual_spiritual_reminder',
-        });
+
+        alarms.add(
+          _alarmPayload(
+            id: (dateCode * 100) + 70 + index,
+            reminder: reminder,
+            trigger: trigger,
+          ),
+        );
       }
     }
-    await _bridge.scheduleAlarms(alarms);
+
+    if (alarms.isEmpty) return 0;
+    return _bridge.scheduleAlarms(alarms);
+  }
+
+  Future<int> scheduleTest(ManualFaithReminder reminder) async {
+    await _bridge.requestNotificationPermission();
+    await _bridge.requestExactAlarmPermission();
+
+    final trigger = DateTime.now().add(const Duration(seconds: 30));
+
+    return _bridge.scheduleAlarms(<Map<String, Object?>>[
+      _alarmPayload(
+        id: 907070,
+        reminder: reminder,
+        trigger: trigger,
+        test: true,
+      ),
+    ]);
+  }
+
+  Map<String, Object?> _alarmPayload({
+    required int id,
+    required ManualFaithReminder reminder,
+    required DateTime trigger,
+    bool test = false,
+  }) {
+    return <String, Object?>{
+      'id': id,
+      'triggerAtMillis': trigger.millisecondsSinceEpoch,
+      'title': reminder.title,
+      'message': test
+          ? 'Manual reminder test.'
+          : 'Your manually scheduled reminder is due now.',
+      'voiceBn': '${reminder.title} সময় হয়েছে।',
+      'voiceEn': 'It is time for ${reminder.title}.',
+      'prayerBn': reminder.title,
+      'prayerEn': reminder.title,
+      'durationSeconds': 15,
+      'voiceRepeat': 1,
+      'prayerKey': test
+          ? 'manual_test_${reminder.id}'
+          : 'manual_${reminder.id}',
+      'eventType': test
+          ? 'manual_spiritual_reminder_test'
+          : 'manual_spiritual_reminder',
+    };
   }
 }

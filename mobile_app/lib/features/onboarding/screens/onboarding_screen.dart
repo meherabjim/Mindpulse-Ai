@@ -273,16 +273,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     String? error;
     if (_currentStep == 0) {
       if (_nameController.text.trim().length < 2) {
-        error = 'Please enter your full name.';
+        error = _t('Please enter your full name.', 'আপনার পূর্ণ নাম লিখুন।');
       } else {
         error = _validateBodyProfile();
       }
       if (error == null && _timezoneController.text.trim().isEmpty) {
-        error = 'Please enter your timezone.';
+        error = _t('Please enter your timezone.', 'আপনার সময় অঞ্চল লিখুন।');
       }
     } else if (_currentStep == 1) {
       if (_userType.isEmpty) {
-        error = 'Select your work or study pattern.';
+        error = _t(
+          'Select your work or study pattern.',
+          'আপনার কাজ বা পড়াশোনার ধরন নির্বাচন করুন।',
+        );
       }
     } else if (_currentStep == 2) {
       if (_religion == 'other' &&
@@ -309,11 +312,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'choose',
         'continue_without',
       }.contains(_permissionMode)) {
-        error = 'Choose a permission setup option.';
+        error = _t(
+          'Choose a permission setup option.',
+          'অনুমতি সেটআপের একটি অপশন নির্বাচন করুন।',
+        );
       }
     } else if (_currentStep == 5 &&
         (!_termsAccepted || !_privacyAccepted || !_wellnessDataAccepted)) {
-      error = 'Terms, privacy and wellness data consent are required.';
+      error = _t(
+        'Terms, privacy and wellness data consent are required.',
+        'শর্তাবলি, গোপনীয়তা ও ওয়েলনেস ডেটা সম্মতি প্রয়োজন।',
+      );
     }
     if (error != null) {
       setState(() => _errorMessage = error);
@@ -494,7 +503,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _permissionMessage = 'Some permission steps are still pending: $error';
+        _permissionMessage = _t(
+          'Some permission steps are still pending: $error',
+          'কিছু অনুমতির ধাপ এখনো বাকি আছে: $error',
+        );
       });
     } finally {
       if (mounted) setState(() => _requestingPermissions = false);
@@ -662,7 +674,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final inches = int.tryParse(_heightInchesController.text.trim());
     final glasses = int.tryParse(_waterGlassesController.text.trim());
     if (weight == null || weight < 20 || weight > 400) {
-      return 'Enter a weight between 20 and 400 kg.';
+      return _t(
+        'Enter a weight between 20 and 400 kg.',
+        '২০ থেকে ৪০০ কেজির মধ্যে ওজন লিখুন।',
+      );
     }
     if (feet == null ||
         inches == null ||
@@ -671,10 +686,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         height == null ||
         height < 80 ||
         height > 250) {
-      return 'Enter a valid height in feet and inches.';
+      return _t(
+        'Enter a valid height in feet and inches.',
+        'ফুট ও ইঞ্চিতে সঠিক উচ্চতা লিখুন।',
+      );
     }
     if (glasses == null || glasses < 0 || glasses > 40) {
-      return 'Enter daily water intake between 0 and 40 glasses.';
+      return _t(
+        'Enter daily water intake between 0 and 40 glasses.',
+        'প্রতিদিন ০ থেকে ৪০ গ্লাসের মধ্যে পানি গ্রহণ লিখুন।',
+      );
     }
     return null;
   }
@@ -761,10 +782,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: Theme.of(context).colorScheme.errorContainer,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Text(_errorMessage!, style: TextStyle(color: Colors.red.shade800)),
+      child: Text(
+        _errorMessage!,
+        style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+      ),
     );
   }
 
@@ -1256,14 +1280,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       spacing: 7,
                       runSpacing: 7,
                       children:
-                          const <MapEntry<int, String>>[
-                            MapEntry<int, String>(1, 'M'),
-                            MapEntry<int, String>(2, 'T'),
-                            MapEntry<int, String>(3, 'W'),
-                            MapEntry<int, String>(4, 'T'),
-                            MapEntry<int, String>(5, 'F'),
-                            MapEntry<int, String>(6, 'S'),
-                            MapEntry<int, String>(7, 'S'),
+                          <MapEntry<int, String>>[
+                            MapEntry<int, String>(1, _t('M', 'সোম')),
+                            MapEntry<int, String>(2, _t('T', 'মঙ্গল')),
+                            MapEntry<int, String>(3, _t('W', 'বুধ')),
+                            MapEntry<int, String>(4, _t('T', 'বৃহঃ')),
+                            MapEntry<int, String>(5, _t('F', 'শুক্র')),
+                            MapEntry<int, String>(6, _t('S', 'শনি')),
+                            MapEntry<int, String>(7, _t('S', 'রবি')),
                           ].map((entry) {
                             final selected = _manualReminderWeekdays.contains(
                               entry.key,
@@ -1660,8 +1684,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.surface,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1683,7 +1707,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final last = _currentStep == _stepTitles.length - 1;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       child: Row(
         children: [
           if (_currentStep > 0)
