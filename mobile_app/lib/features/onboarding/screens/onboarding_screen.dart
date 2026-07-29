@@ -534,80 +534,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _showReligionPicker() async {
-    final searchController = TextEditingController();
     final selected = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) {
-        var query = '';
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final entries = _religionLabels.entries.where((entry) {
-              return entry.value.toLowerCase().contains(query.toLowerCase());
-            }).toList();
-
-            return SafeArea(
-              child: SizedBox(
-                height: MediaQuery.sizeOf(context).height * 0.72,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    18,
-                    4,
-                    18,
-                    MediaQuery.viewInsetsOf(context).bottom + 18,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _t('Choose religion', 'ধর্ম নির্বাচন করুন'),
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: searchController,
-                        autofocus: true,
-                        decoration: InputDecoration(
-                          labelText: _t('Search', 'খুঁজুন'),
-                          prefixIcon: const Icon(Icons.search_rounded),
-                        ),
-                        onChanged: (value) {
-                          setSheetState(() => query = value.trim());
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: entries.length,
-                          itemBuilder: (context, index) {
-                            final entry = entries[index];
-                            final chosen = entry.key == _religion;
-                            return ListTile(
-                              leading: Icon(
-                                chosen
-                                    ? Icons.radio_button_checked_rounded
-                                    : Icons.radio_button_off_rounded,
-                              ),
-                              title: Text(entry.value),
-                              onTap: () =>
-                                  Navigator.of(sheetContext).pop(entry.key),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+        return _ReligionPickerSheet(
+          labels: Map<String, String>.from(_religionLabels),
+          selectedReligion: _religion,
+          title: _t('Choose religion', 'ধর্ম নির্বাচন করুন'),
+          searchLabel: _t('Search', 'খুঁজুন'),
         );
       },
     );
-    searchController.dispose();
 
     if (selected == null || !mounted) return;
     setState(() {
@@ -1743,6 +1682,107 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReligionPickerSheet extends StatefulWidget {
+  const _ReligionPickerSheet({
+    required this.labels,
+    required this.selectedReligion,
+    required this.title,
+    required this.searchLabel,
+  });
+
+  final Map<String, String> labels;
+  final String selectedReligion;
+  final String title;
+  final String searchLabel;
+
+  @override
+  State<_ReligionPickerSheet> createState() => _ReligionPickerSheetState();
+}
+
+class _ReligionPickerSheetState extends State<_ReligionPickerSheet> {
+  late final TextEditingController _searchController;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = widget.labels.entries.where((entry) {
+      return entry.value.toLowerCase().contains(_query.toLowerCase());
+    }).toList();
+
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.72,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            18,
+            4,
+            18,
+            MediaQuery.viewInsetsOf(context).bottom + 18,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: widget.searchLabel,
+                  prefixIcon: const Icon(Icons.search_rounded),
+                ),
+                onChanged: (value) {
+                  setState(() => _query = value.trim());
+                },
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    final chosen = entry.key == widget.selectedReligion;
+
+                    return ListTile(
+                      leading: Icon(
+                        chosen
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_off_rounded,
+                      ),
+                      title: Text(entry.value),
+                      onTap: () {
+                        FocusScope.of(context).unfocus();
+                        Navigator.of(context).pop(entry.key);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
