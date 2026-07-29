@@ -35,12 +35,23 @@ class _OnboardingGateState extends State<OnboardingGate> {
     final settings = _asMap(results[1]);
     final appSettings = _asMap(settings['app_settings']);
 
-    await AppPreferencesController.instance.apply(
+    _applyPreferencesAfterFrame(
       languageCode: appSettings['language_code']?.toString(),
       themeMode: appSettings['theme_mode']?.toString(),
     );
 
     return status;
+  }
+
+  void _applyPreferencesAfterFrame({String? languageCode, String? themeMode}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      await AppPreferencesController.instance.apply(
+        languageCode: languageCode,
+        themeMode: themeMode,
+      );
+    });
   }
 
   void _retry() {

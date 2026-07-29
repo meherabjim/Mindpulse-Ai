@@ -222,7 +222,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _notificationPreferences = notifications;
         _loading = false;
       });
-      await AppPreferencesController.instance.apply(
+      _applyPreferencesAfterFrame(
         languageCode: _languageCode,
         themeMode: _themeMode,
       );
@@ -233,6 +233,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _loading = false;
       });
     }
+  }
+
+  void _applyPreferencesAfterFrame({String? languageCode, String? themeMode}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      await AppPreferencesController.instance.apply(
+        languageCode: languageCode,
+        themeMode: themeMode,
+      );
+    });
   }
 
   bool _consentGranted(Map<String, dynamic> consents, String key) {
@@ -1374,12 +1385,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     DropdownMenuItem(value: 'en', child: Text('English')),
                     DropdownMenuItem(value: 'bn', child: Text('বাংলা')),
                   ],
-                  onChanged: (value) async {
+                  onChanged: (value) {
                     if (value == null) return;
                     setState(() => _languageCode = value);
-                    await AppPreferencesController.instance.apply(
-                      languageCode: value,
-                    );
+                    _applyPreferencesAfterFrame(languageCode: value);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -1403,12 +1412,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: Text(_t('Dark', 'ডার্ক')),
                     ),
                   ],
-                  onChanged: (value) async {
+                  onChanged: (value) {
                     if (value == null) return;
                     setState(() => _themeMode = value);
-                    await AppPreferencesController.instance.apply(
-                      themeMode: value,
-                    );
+                    _applyPreferencesAfterFrame(themeMode: value);
                   },
                 ),
                 const SizedBox(height: 8),
