@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/settings/app_preferences_controller.dart';
 import '../../account/screens/account_settings_screen.dart';
 import '../../account/screens/edit_profile_screen.dart';
 import '../../account/screens/emergency_contacts_screen.dart';
 import '../../account/services/account_service.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../auth/services/auth_service.dart';
+import '../../companion/widgets/companion_dashboard_card.dart';
 import '../../engagement/screens/achievements_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -23,6 +25,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _loading = true;
   String? _errorMessage;
+
+  String _t(String english, String bangla) {
+    return AppPreferencesController.instance.text(english, bangla);
+  }
 
   @override
   void initState() {
@@ -92,9 +98,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _logout() async {
     final confirmed = await _confirmAction(
-      title: 'Logout',
-      message: 'Are you sure you want to logout from this device?',
-      actionLabel: 'Logout',
+      title: _t('Logout', 'লগআউট'),
+      message: _t(
+        'Are you sure you want to logout from this device?',
+        'আপনি কি এই ডিভাইস থেকে লগআউট করতে চান?',
+      ),
+      actionLabel: _t('Logout', 'লগআউট'),
     );
 
     if (confirmed != true) return;
@@ -108,9 +117,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _logoutAllDevices() async {
     final confirmed = await _confirmAction(
-      title: 'Logout from all devices',
-      message: 'All active MindPulse sessions will be closed.',
-      actionLabel: 'Logout All',
+      title: _t('Logout from all devices', 'সব ডিভাইস থেকে লগআউট'),
+      message: _t(
+        'All active MindPulse sessions will be closed.',
+        'MindPulse-এর সব সক্রিয় সেশন বন্ধ হয়ে যাবে।',
+      ),
+      actionLabel: _t('Logout All', 'সব জায়গা থেকে লগআউট'),
     );
 
     if (confirmed != true) return;
@@ -149,7 +161,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: () {
                 Navigator.of(dialogContext).pop(false);
               },
-              child: const Text('Cancel'),
+              child: Text(_t('Cancel', 'বাতিল')),
             ),
             FilledButton(
               onPressed: () {
@@ -170,17 +182,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  String _profileText(String key, {String fallback = 'Not provided'}) {
+  String _profileText(String key, {String? fallback}) {
     final value = _profile[key]?.toString().trim();
 
     if (value == null || value.isEmpty) {
-      return fallback;
+      return fallback ?? _t('Not provided', 'প্রদান করা হয়নি');
     }
 
     return value;
   }
 
   String _displayValue(String value) {
+    final normalized = value.trim().toLowerCase().replaceAll(' ', '_');
+
+    if (AppPreferencesController.instance.isBangla) {
+      const banglaValues = <String, String>{
+        'student': 'শিক্ষার্থী',
+        'employed': 'চাকরিজীবী',
+        'self_employed': 'স্বনিযুক্ত',
+        'unemployed': 'বর্তমানে কর্মরত নন',
+        'retired': 'অবসরপ্রাপ্ত',
+        'homemaker': 'গৃহস্থালি কাজ',
+        'other': 'অন্যান্য',
+        'bn': 'বাংলা',
+        'en': 'ইংরেজি',
+        'asia/dhaka': 'এশিয়া/ঢাকা',
+      };
+
+      final translated = banglaValues[normalized];
+      if (translated != null) {
+        return translated;
+      }
+    }
+
     return value
         .replaceAll('_', ' ')
         .split(' ')
@@ -193,15 +227,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FC),
+      backgroundColor: colors.surface,
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text(_t('Profile', 'প্রোফাইল')),
         actions: [
           IconButton(
             onPressed: _loading ? null : _openEditProfile,
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit profile',
+            tooltip: _t('Edit profile', 'প্রোফাইল সম্পাদনা'),
           ),
         ],
       ),
@@ -218,16 +254,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       margin: const EdgeInsets.only(bottom: 14),
                       padding: const EdgeInsets.all(13),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
+                        color: colors.errorContainer,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Text(
-                        'Live profile could not be loaded. Cached information is being displayed.',
-                        style: TextStyle(color: Colors.orange.shade900),
+                        _t(
+                          'Live profile could not be loaded. Cached information is being displayed.',
+                          'লাইভ প্রোফাইল লোড করা যায়নি। সংরক্ষিত তথ্য দেখানো হচ্ছে।',
+                        ),
+                        style: TextStyle(color: colors.onErrorContainer),
                       ),
                     ),
                   _buildProfileHeader(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
+                  Text(
+                    _t('Your companion', 'আপনার সহকারী'),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    _t(
+                      'Suggestions, approved signals and every companion permission are together here.',
+                      'পরামর্শ, অনুমোদিত সংকেত এবং সহকারীর সব অনুমতি এখানে একসঙ্গে রয়েছে।',
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const CompanionDashboardCard(),
+                  const SizedBox(height: 20),
                   _buildProfileInformation(),
                   const SizedBox(height: 16),
                   _buildAccountMenu(),
@@ -240,7 +299,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileHeader() {
-    final fullName = _profileText('full_name', fallback: 'MindPulse User');
+    final fullName = _profileText(
+      'full_name',
+      fallback: _t('MindPulse User', 'MindPulse ব্যবহারকারী'),
+    );
 
     final email = _profileText('email', fallback: '');
 
@@ -287,17 +349,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 5),
-          Text(
-            email,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFFEDEBFF)),
-          ),
+          if (email.isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(
+              email,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFFEDEBFF)),
+            ),
+          ],
           const SizedBox(height: 15),
           FilledButton.tonalIcon(
             onPressed: _openEditProfile,
             icon: const Icon(Icons.edit_outlined),
-            label: const Text('Edit Profile'),
+            label: Text(_t('Edit Profile', 'প্রোফাইল সম্পাদনা')),
           ),
         ],
       ),
@@ -311,39 +375,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Personal Information',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            Text(
+              _t('Personal Information', 'ব্যক্তিগত তথ্য'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 12),
             _infoTile(
               Icons.badge_outlined,
-              'User type',
+              _t('User type', 'ব্যবহারকারীর ধরন'),
               _displayValue(_profileText('user_type')),
             ),
             const Divider(height: 1),
             _infoTile(
               Icons.work_outline,
-              'Occupation',
-              _profileText('occupation'),
+              _t('Occupation', 'পেশা'),
+              _displayValue(_profileText('occupation')),
             ),
             const Divider(height: 1),
             _infoTile(
               Icons.flag_outlined,
-              'Wellness goal',
-              _profileText('wellness_goal'),
+              _t('Wellness goal', 'সুস্থতার লক্ষ্য'),
+              _displayValue(_profileText('wellness_goal')),
             ),
             const Divider(height: 1),
             _infoTile(
               Icons.language_rounded,
-              'Language',
-              _profileText('preferred_language', fallback: 'en'),
+              _t('Language', 'ভাষা'),
+              _displayValue(_profileText('preferred_language', fallback: 'en')),
             ),
             const Divider(height: 1),
             _infoTile(
               Icons.public_rounded,
-              'Timezone',
-              _profileText('timezone', fallback: 'Asia/Dhaka'),
+              _t('Timezone', 'সময়সীমা'),
+              _displayValue(_profileText('timezone', fallback: 'Asia/Dhaka')),
             ),
           ],
         ),
@@ -357,22 +421,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _menuTile(
             icon: Icons.settings_outlined,
-            title: 'Account Settings',
-            subtitle: 'Privacy, analysis and notifications',
+            title: _t('App and account settings', 'অ্যাপ ও অ্যাকাউন্ট সেটিংস'),
+            subtitle: _t(
+              'Language, theme, privacy and notifications',
+              'ভাষা, থিম, গোপনীয়তা ও নোটিফিকেশন',
+            ),
             onTap: _openSettings,
           ),
           const Divider(height: 1),
           _menuTile(
             icon: Icons.contact_emergency_outlined,
-            title: 'Emergency Contacts',
-            subtitle: 'Manage trusted emergency contacts',
+            title: _t('Emergency Contacts', 'জরুরি যোগাযোগ'),
+            subtitle: _t(
+              'Manage trusted emergency contacts',
+              'বিশ্বস্ত জরুরি যোগাযোগ পরিচালনা করুন',
+            ),
             onTap: _openEmergencyContacts,
           ),
           const Divider(height: 1),
           _menuTile(
             icon: Icons.emoji_events_outlined,
-            title: 'Achievements',
-            subtitle: 'View badges, points and level',
+            title: _t('Achievements', 'অর্জন'),
+            subtitle: _t(
+              'View badges, points and level',
+              'ব্যাজ, পয়েন্ট ও স্তর দেখুন',
+            ),
             onTap: _openAchievements,
           ),
         ],
@@ -386,15 +459,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _menuTile(
             icon: Icons.logout_rounded,
-            title: 'Logout',
-            subtitle: 'Logout from this device',
+            title: _t('Logout', 'লগআউট'),
+            subtitle: _t(
+              'Logout from this device',
+              'এই ডিভাইস থেকে লগআউট করুন',
+            ),
             onTap: _logout,
           ),
           const Divider(height: 1),
           _menuTile(
             icon: Icons.devices_other_outlined,
-            title: 'Logout from All Devices',
-            subtitle: 'Close every active session',
+            title: _t('Logout from All Devices', 'সব ডিভাইস থেকে লগআউট'),
+            subtitle: _t(
+              'Close every active session',
+              'সব সক্রিয় সেশন বন্ধ করুন',
+            ),
             onTap: _logoutAllDevices,
             destructive: true,
           ),
@@ -419,20 +498,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required VoidCallback onTap,
     bool destructive = false,
   }) {
-    final color = destructive ? Colors.red : const Color(0xFF6059E8);
+    final colors = Theme.of(context).colorScheme;
+    final color = destructive ? colors.error : const Color(0xFF6059E8);
 
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: destructive
-            ? Colors.red.shade50
-            : const Color(0xFFF0EFFF),
+            ? colors.errorContainer
+            : colors.primaryContainer,
         child: Icon(icon, color: color),
       ),
       title: Text(
         title,
         style: TextStyle(
           fontWeight: FontWeight.w800,
-          color: destructive ? Colors.red : null,
+          color: destructive ? colors.error : null,
         ),
       ),
       subtitle: Text(subtitle),

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/settings/app_preferences_controller.dart';
-import '../../companion/widgets/companion_dashboard_card.dart';
-
 import '../../safety/screens/emergency_support_screen.dart';
 
 import '../../checkin/screens/daily_checkin_screen.dart';
@@ -10,9 +8,7 @@ import '../../wellness/screens/wellness_scan_screen.dart';
 import '../../wellness/services/wellness_scan_service.dart';
 import '../../journal/screens/journal_screen.dart';
 import '../../habit/screens/habit_screen.dart';
-import '../../engagement/screens/notifications_screen.dart';
 import '../../engagement/screens/achievements_screen.dart';
-import '../../engagement/services/engagement_service.dart';
 import '../../recovery/screens/recovery_screen.dart';
 import '../../reports/screens/weekly_report_screen.dart';
 
@@ -152,7 +148,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           NavigationDestination(
             icon: const Icon(Icons.auto_awesome_outlined),
             selectedIcon: const Icon(Icons.auto_awesome),
-            label: _t('AI Wellness', 'AI ওয়েলনেস'),
+            label: _t('AI Wellness', 'এআই সুস্থতা'),
           ),
           NavigationDestination(
             icon: Icon(faithIcon),
@@ -366,13 +362,10 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                 _buildFaithCard(context),
                 const SizedBox(height: 20),
               ],
-              // HUMAN_COMPANION_DASHBOARD_ENTRY_V1
-              const CompanionDashboardCard(),
-              const SizedBox(height: 20),
               _buildAiCard(context),
               const SizedBox(height: 24),
               Text(
-                _t('Your wellness tools', 'আপনার ওয়েলনেস টুলস'),
+                _t('Your wellness tools', 'আপনার সুস্থতার টুলস'),
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -529,8 +522,6 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
             ],
           ),
         ),
-
-        const _NotificationBell(),
       ],
     );
   }
@@ -551,12 +542,12 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
     final description = _wellnessLoading
         ? _t(
             'Checking today’s completed Wellness Scan...',
-            'আজকের Wellness Scan যাচাই করা হচ্ছে...',
+            'আজকের সুস্থতা যাচাই করা হচ্ছে...',
           )
         : !hasTodayScore
         ? _t(
             'No Wellness Scan has been completed today. Complete a new scan to create today’s score.',
-            'আজ কোনো Wellness Scan সম্পন্ন হয়নি। আজকের স্কোর তৈরি করতে নতুন একটি scan সম্পন্ন করুন।',
+            'আজ কোনো সুস্থতা যাচাই সম্পন্ন হয়নি। আজকের স্কোর তৈরি করতে নতুন একটি যাচাই সম্পন্ন করুন।',
           )
         : _t(
             'Higher values indicate more strain. Source: MindPulse Wellness Scan. Informational only; not a WHO score or medical diagnosis.',
@@ -1033,97 +1024,6 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
           ),
         );
       },
-    );
-  }
-}
-
-class _NotificationBell extends StatefulWidget {
-  const _NotificationBell();
-
-  @override
-  State<_NotificationBell> createState() => _NotificationBellState();
-}
-
-class _NotificationBellState extends State<_NotificationBell> {
-  final EngagementService _service = EngagementService();
-
-  int _unreadCount = 0;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUnreadCount();
-  }
-
-  Future<void> _loadUnreadCount() async {
-    try {
-      final count = await _service.getUnreadCount();
-
-      if (!mounted) return;
-
-      setState(() {
-        _unreadCount = count;
-        _loading = false;
-      });
-    } catch (error) {
-      debugPrint('MindPulse: Unread notification count failed: $error');
-
-      if (!mounted) return;
-
-      setState(() {
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _openNotifications() async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
-    );
-
-    if (mounted) {
-      await _loadUnreadCount();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton.filledTonal(
-          onPressed: _openNotifications,
-          icon: const Icon(Icons.notifications_none_rounded),
-          tooltip: AppPreferencesController.instance.text(
-            'Notifications',
-            'নোটিফিকেশন',
-          ),
-        ),
-        if (!_loading && _unreadCount > 0)
-          Positioned(
-            right: -3,
-            top: -3,
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.red.shade600,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                _unreadCount > 99 ? '99+' : '$_unreadCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 }
