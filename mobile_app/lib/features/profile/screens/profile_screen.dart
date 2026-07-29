@@ -7,6 +7,7 @@ import '../../account/screens/emergency_contacts_screen.dart';
 import '../../account/services/account_service.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../auth/services/auth_service.dart';
+import '../../companion/screens/companion_permissions_screen.dart';
 import '../../companion/widgets/companion_dashboard_card.dart';
 import '../../engagement/screens/achievements_screen.dart';
 
@@ -22,7 +23,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final AccountService _accountService = AccountService();
 
   Map<String, dynamic> _profile = <String, dynamic>{};
-
   bool _loading = true;
   String? _errorMessage;
 
@@ -37,14 +37,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final profile = await _accountService.getProfile();
-
       if (!mounted) return;
 
       setState(() {
@@ -53,7 +54,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     } catch (error) {
       final cachedUser = await _authService.getUser();
-
       if (!mounted) return;
 
       setState(() {
@@ -72,9 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (result != null && mounted) {
-      setState(() {
-        _profile = result;
-      });
+      setState(() => _profile = result);
     }
   }
 
@@ -82,6 +80,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(builder: (_) => const AccountSettingsScreen()),
     );
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _openCompanionPermissions() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const CompanionPermissionsScreen(),
+      ),
+    );
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _openEmergencyContacts() async {
@@ -109,9 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (confirmed != true) return;
 
     await _authService.logout();
-
     if (!mounted) return;
-
     _goToLogin();
   }
 
@@ -129,9 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       await _accountService.logoutAllDevices();
-
       if (!mounted) return;
-
       _goToLogin();
     } catch (error) {
       if (!mounted) return;
@@ -158,15 +168,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           content: Text(message),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(false);
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(false),
               child: Text(_t('Cancel', 'বাতিল')),
             ),
             FilledButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(true);
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               child: Text(actionLabel),
             ),
           ],
@@ -210,9 +216,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       };
 
       final translated = banglaValues[normalized];
-      if (translated != null) {
-        return translated;
-      }
+      if (translated != null) return translated;
     }
 
     return value
@@ -232,7 +236,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: AppBar(
-        title: Text(_t('Profile', 'প্রোফাইল')),
+        title: Text(_t('My profile', 'আমার প্রোফাইল')),
+        centerTitle: false,
         actions: [
           IconButton(
             onPressed: _loading ? null : _openEditProfile,
@@ -247,50 +252,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onRefresh: _loadProfile,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 42),
                 children: [
-                  if (_errorMessage != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      padding: const EdgeInsets.all(13),
-                      decoration: BoxDecoration(
-                        color: colors.errorContainer,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        _t(
-                          'Live profile could not be loaded. Cached information is being displayed.',
-                          'লাইভ প্রোফাইল লোড করা যায়নি। সংরক্ষিত তথ্য দেখানো হচ্ছে।',
-                        ),
-                        style: TextStyle(color: colors.onErrorContainer),
-                      ),
-                    ),
-                  _buildProfileHeader(),
-                  const SizedBox(height: 20),
-                  Text(
-                    _t('Your companion', 'আপনার সহকারী'),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
+                  if (_errorMessage != null) _buildCachedProfileBanner(),
+                  _buildProfileHero(),
+                  const SizedBox(height: 22),
+                  _sectionHeading(
+                    icon: Icons.dashboard_customize_outlined,
+                    title: _t('Control centre', 'নিয়ন্ত্রণ কেন্দ্র'),
+                    subtitle: _t(
+                      'Your most important settings in one place.',
+                      'সব গুরুত্বপূর্ণ সেটিংস এক জায়গায় সাজানো হয়েছে।',
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    _t(
-                      'Suggestions, approved signals and every companion permission are together here.',
-                      'পরামর্শ, অনুমোদিত সংকেত এবং সহকারীর সব অনুমতি এখানে একসঙ্গে রয়েছে।',
-                    ),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                      height: 1.4,
+                  const SizedBox(height: 12),
+                  _buildQuickActions(),
+                  const SizedBox(height: 24),
+                  _sectionHeading(
+                    icon: Icons.auto_awesome_rounded,
+                    title: _t('Your companion', 'আপনার সহকারী'),
+                    subtitle: _t(
+                      'Suggestions, approved signals and every companion permission.',
+                      'পরামর্শ, অনুমোদিত সংকেত এবং সহকারীর সব অনুমতি।',
                     ),
                   ),
                   const SizedBox(height: 12),
                   const CompanionDashboardCard(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
+                  _sectionHeading(
+                    icon: Icons.person_outline_rounded,
+                    title: _t('Personal information', 'ব্যক্তিগত তথ্য'),
+                    subtitle: _t(
+                      'Your profile details and preferred experience.',
+                      'আপনার পরিচয় ও পছন্দের অভিজ্ঞতার তথ্য।',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   _buildProfileInformation(),
-                  const SizedBox(height: 16),
-                  _buildAccountMenu(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
+                  _sectionHeading(
+                    icon: Icons.shield_outlined,
+                    title: _t('Account and security', 'অ্যাকাউন্ট ও নিরাপত্তা'),
+                    subtitle: _t(
+                      'Session controls and safe account actions.',
+                      'সেশন নিয়ন্ত্রণ ও নিরাপদ অ্যাকাউন্ট ব্যবস্থা।',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   _buildSecurityMenu(),
                 ],
               ),
@@ -298,88 +306,307 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader() {
-    final fullName = _profileText(
-      'full_name',
-      fallback: _t('MindPulse User', 'MindPulse ব্যবহারকারী'),
-    );
-
-    final email = _profileText('email', fallback: '');
-
-    final photoUrl = _profile['profile_photo_url']?.toString().trim();
+  Widget _buildCachedProfileBanner() {
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF5C58E8), Color(0xFF875EF0)],
-        ),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x335C58E8),
-            blurRadius: 20,
-            offset: Offset(0, 10),
-          ),
-        ],
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: Column(
+      child: Row(
         children: [
-          CircleAvatar(
-            radius: 52,
-            backgroundColor: const Color(0x33FFFFFF),
-            backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                ? NetworkImage(photoUrl)
-                : null,
-            child: photoUrl == null || photoUrl.isEmpty
-                ? const Icon(
-                    Icons.person_rounded,
-                    color: Colors.white,
-                    size: 58,
-                  )
-                : null,
-          ),
-          const SizedBox(height: 15),
-          Text(
-            fullName,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 25,
-              fontWeight: FontWeight.w900,
+          Icon(Icons.cloud_off_outlined, color: colors.onErrorContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _t(
+                'Live profile could not be loaded. Cached information is being displayed.',
+                'লাইভ প্রোফাইল লোড করা যায়নি। সংরক্ষিত তথ্য দেখানো হচ্ছে।',
+              ),
+              style: TextStyle(color: colors.onErrorContainer),
             ),
-          ),
-          if (email.isNotEmpty) ...[
-            const SizedBox(height: 5),
-            Text(
-              email,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFEDEBFF)),
-            ),
-          ],
-          const SizedBox(height: 15),
-          FilledButton.tonalIcon(
-            onPressed: _openEditProfile,
-            icon: const Icon(Icons.edit_outlined),
-            label: Text(_t('Edit Profile', 'প্রোফাইল সম্পাদনা')),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProfileInformation() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(17),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _t('Personal Information', 'ব্যক্তিগত তথ্য'),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+  Widget _buildProfileHero() {
+    final fullName = _profileText(
+      'full_name',
+      fallback: _t('MindPulse User', 'MindPulse ব্যবহারকারী'),
+    );
+    final email = _profileText('email', fallback: '');
+    final userType = _displayValue(_profileText('user_type'));
+    final photoUrl = _profile['profile_photo_url']?.toString().trim();
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF5C58E8), Color(0xFF8A63F4)],
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x335C58E8),
+            blurRadius: 26,
+            offset: Offset(0, 13),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 42,
+                backgroundColor: const Color(0x33FFFFFF),
+                backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                    ? NetworkImage(photoUrl)
+                    : null,
+                child: photoUrl == null || photoUrl.isEmpty
+                    ? const Icon(
+                        Icons.person_rounded,
+                        color: Colors.white,
+                        size: 48,
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fullName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (email.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFFEDEBFF)),
+                      ),
+                    ],
+                    const SizedBox(height: 9),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0x26FFFFFF),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        userType,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: _openEditProfile,
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(_t('Edit profile', 'প্রোফাইল সম্পাদনা')),
             ),
-            const SizedBox(height: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionHeading({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: colors.primaryContainer,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: colors.onPrimaryContainer),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = (constraints.maxWidth - 12) / 2;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _quickAction(
+              width: itemWidth,
+              icon: Icons.tune_rounded,
+              title: _t('App settings', 'অ্যাপ সেটিংস'),
+              subtitle: _t(
+                'Language, theme and alerts',
+                'ভাষা, থিম ও নোটিফিকেশন',
+              ),
+              onTap: _openSettings,
+            ),
+            _quickAction(
+              width: itemWidth,
+              icon: Icons.admin_panel_settings_outlined,
+              title: _t('Companion access', 'সহকারীর অনুমতি'),
+              subtitle: _t('Signals and permissions', 'সংকেত ও সব অনুমতি'),
+              onTap: _openCompanionPermissions,
+            ),
+            _quickAction(
+              width: itemWidth,
+              icon: Icons.contact_emergency_outlined,
+              title: _t('Emergency contacts', 'জরুরি যোগাযোগ'),
+              subtitle: _t('Trusted people', 'বিশ্বস্ত ব্যক্তিদের তালিকা'),
+              onTap: _openEmergencyContacts,
+            ),
+            _quickAction(
+              width: itemWidth,
+              icon: Icons.emoji_events_outlined,
+              title: _t('Achievements', 'অর্জন'),
+              subtitle: _t('Badges and progress', 'ব্যাজ ও অগ্রগতি'),
+              onTap: _openAchievements,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _quickAction({
+    required double width,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      width: width,
+      child: Material(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 142),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: colors.outlineVariant),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: colors.onPrimaryContainer),
+                ),
+                const SizedBox(height: 13),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.onSurfaceVariant, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileInformation() {
+    final colors = Theme.of(context).colorScheme;
+
+    return Card(
+      elevation: 0,
+      color: colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          children: [
             _infoTile(
               Icons.badge_outlined,
               _t('User type', 'ব্যবহারকারীর ধরন'),
@@ -387,7 +614,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const Divider(height: 1),
             _infoTile(
-              Icons.work_outline,
+              Icons.work_outline_rounded,
               _t('Occupation', 'পেশা'),
               _displayValue(_profileText('occupation')),
             ),
@@ -406,7 +633,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const Divider(height: 1),
             _infoTile(
               Icons.public_rounded,
-              _t('Timezone', 'সময়সীমা'),
+              _t('Timezone', 'সময় অঞ্চল'),
               _displayValue(_profileText('timezone', fallback: 'Asia/Dhaka')),
             ),
           ],
@@ -415,46 +642,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildAccountMenu() {
-    return Card(
-      child: Column(
-        children: [
-          _menuTile(
-            icon: Icons.settings_outlined,
-            title: _t('App and account settings', 'অ্যাপ ও অ্যাকাউন্ট সেটিংস'),
-            subtitle: _t(
-              'Language, theme, privacy and notifications',
-              'ভাষা, থিম, গোপনীয়তা ও নোটিফিকেশন',
-            ),
-            onTap: _openSettings,
-          ),
-          const Divider(height: 1),
-          _menuTile(
-            icon: Icons.contact_emergency_outlined,
-            title: _t('Emergency Contacts', 'জরুরি যোগাযোগ'),
-            subtitle: _t(
-              'Manage trusted emergency contacts',
-              'বিশ্বস্ত জরুরি যোগাযোগ পরিচালনা করুন',
-            ),
-            onTap: _openEmergencyContacts,
-          ),
-          const Divider(height: 1),
-          _menuTile(
-            icon: Icons.emoji_events_outlined,
-            title: _t('Achievements', 'অর্জন'),
-            subtitle: _t(
-              'View badges, points and level',
-              'ব্যাজ, পয়েন্ট ও স্তর দেখুন',
-            ),
-            onTap: _openAchievements,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSecurityMenu() {
+    final colors = Theme.of(context).colorScheme;
+
     return Card(
+      elevation: 0,
+      color: colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
       child: Column(
         children: [
           _menuTile(
@@ -469,7 +666,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(height: 1),
           _menuTile(
             icon: Icons.devices_other_outlined,
-            title: _t('Logout from All Devices', 'সব ডিভাইস থেকে লগআউট'),
+            title: _t('Logout from all devices', 'সব ডিভাইস থেকে লগআউট'),
             subtitle: _t(
               'Close every active session',
               'সব সক্রিয় সেশন বন্ধ করুন',
@@ -484,9 +681,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _infoTile(IconData icon, String title, String value) {
     return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: const Color(0xFF6059E8)),
-      title: Text(title),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      leading: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(
+          icon,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
       subtitle: Text(value),
     );
   }
@@ -499,19 +707,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool destructive = false,
   }) {
     final colors = Theme.of(context).colorScheme;
-    final color = destructive ? colors.error : const Color(0xFF6059E8);
+    final iconColor = destructive ? colors.error : colors.primary;
+    final iconBackground = destructive
+        ? colors.errorContainer
+        : colors.primaryContainer;
 
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: destructive
-            ? colors.errorContainer
-            : colors.primaryContainer,
-        child: Icon(icon, color: color),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: iconBackground,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Icon(icon, color: iconColor),
       ),
       title: Text(
         title,
         style: TextStyle(
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
           color: destructive ? colors.error : null,
         ),
       ),
