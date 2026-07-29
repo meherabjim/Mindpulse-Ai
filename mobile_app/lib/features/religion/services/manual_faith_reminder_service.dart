@@ -180,12 +180,12 @@ class ManualFaithReminderService {
       'triggerAtMillis': trigger.millisecondsSinceEpoch,
       'title': reminder.title,
       'message': test
-          ? 'Manual reminder test.'
-          : 'Your manually scheduled reminder is due now.',
-      'voiceBn': '${reminder.title} সময় হয়েছে।',
+          ? 'MindPulse reminder test.'
+          : 'Your reminder is due now.',
+      'voiceBn': 'এখন ${reminder.title} করার সময় হয়েছে।',
       'voiceEn': 'It is time for ${reminder.title}.',
-      'prayerBn': reminder.title,
-      'prayerEn': reminder.title,
+      'prayerBn': '',
+      'prayerEn': '',
       'durationSeconds': 15,
       'voiceRepeat': 1,
       'prayerKey': test

@@ -186,14 +186,21 @@ object PrayerAlarmScheduler {
         val intent = Intent(context, PrayerAlarmReceiver::class.java).apply {
             action = actionAlarm
             putExtra("alarmId", id)
-            putExtra("title", item.optString("title", "Prayer alarm"))
-            putExtra("message", item.optString("message", "Prayer reminder"))
+            putExtra("title", item.optString("title", "MindPulse alarm"))
+            putExtra(
+                "message",
+                item.optString("message", "Your reminder is due now.")
+            )
             putExtra("voiceBn", item.optString("voiceBn", ""))
             putExtra("voiceEn", item.optString("voiceEn", ""))
             putExtra("prayerBn", item.optString("prayerBn", ""))
             putExtra("prayerEn", item.optString("prayerEn", ""))
             putExtra("durationSeconds", item.optInt("durationSeconds", 15))
             putExtra("voiceRepeat", item.optInt("voiceRepeat", 1))
+            putExtra(
+                "eventType",
+                item.optString("eventType", "prayer_reminder")
+            )
         }
 
         return PendingIntent.getBroadcast(
@@ -244,14 +251,15 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
     private var voiceEn = ""
     private var prayerBn = ""
     private var prayerEn = ""
+    private var currentEventType = "prayer_reminder"
     private var voiceRepeat = 1
     private var useEnglishVoice = false
     private var soundCompleted = false
     private var ttsReady = false
     private var stopped = false
     private var alarmStarted = false
-    private var currentTitle = "Prayer reminder"
-    private var currentMessage = "Prayer reminder was triggered."
+    private var currentTitle = "MindPulse reminder"
+    private var currentMessage = "Your reminder is due now."
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -277,13 +285,15 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
         ttsReady = false
 
         currentTitle =
-            intent.getStringExtra("title") ?: "Prayer alarm"
+            intent.getStringExtra("title") ?: "MindPulse alarm"
         currentMessage =
-            intent.getStringExtra("message") ?: "Prayer reminder"
+            intent.getStringExtra("message") ?: "Your reminder is due now."
         voiceBn = intent.getStringExtra("voiceBn") ?: ""
         voiceEn = intent.getStringExtra("voiceEn") ?: ""
         prayerBn = intent.getStringExtra("prayerBn") ?: ""
         prayerEn = intent.getStringExtra("prayerEn") ?: ""
+        currentEventType =
+            intent.getStringExtra("eventType") ?: "prayer_reminder"
         useEnglishVoice = false
         val durationSeconds = intent
             .getIntExtra("durationSeconds", 15)
@@ -406,7 +416,18 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
         ).format(Date())
     }
 
+    private fun isManualReminder(): Boolean {
+        return currentEventType.startsWith("manual_")
+    }
+
     private fun buildBanglaVoice(): String {
+        if (isManualReminder()) {
+            return voiceBn.ifBlank {
+                "এখন ${currentBanglaTimeText()} বাজে। " +
+                    "আপনার রিমাইন্ডারের সময় হয়েছে।"
+            }
+        }
+
         if (prayerBn.isBlank()) {
             return voiceBn.ifBlank {
                 voiceEn.ifBlank {
@@ -421,6 +442,13 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun buildEnglishVoice(): String {
+        if (isManualReminder()) {
+            return voiceEn.ifBlank {
+                "It is now ${currentEnglishTimeText()}. " +
+                    "Your reminder is due."
+            }
+        }
+
         if (prayerEn.isBlank()) {
             return voiceEn.ifBlank {
                 "Please prepare for prayer."
@@ -573,7 +601,7 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
         )
 
         val completedMessage =
-            "$message Prayer reminder was triggered."
+            "$message Reminder was triggered."
 
         return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -601,10 +629,10 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
 
         val channel = NotificationChannel(
             channelId,
-            "Prayer alarms",
+            "Reminders and alarms",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "MindPulse prayer alarm sound and voice"
+            description = "MindPulse reminder alarm sound and voice"
             setSound(null, null)
             enableVibration(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC

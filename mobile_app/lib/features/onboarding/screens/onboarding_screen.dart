@@ -1107,8 +1107,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           icon: Icons.self_improvement_outlined,
           title: _t('Religion and reminders', 'ধর্ম ও রিমাইন্ডার'),
           text: _t(
-            'This controls which faith content appears. MindPulse never shows Muslim prayer content to non-Muslim profiles.',
-            'এটি কোন ধর্মীয় তথ্য দেখানো হবে তা নিয়ন্ত্রণ করে। অমুসলিম প্রোফাইলে MindPulse কখনো মুসলিম নামাজের তথ্য দেখাবে না।',
+            'MindPulse shows only the faith and reminder experience that matches your choice.',
+            'MindPulse শুধু আপনার পছন্দ অনুযায়ী ধর্ম ও রিমাইন্ডারের অভিজ্ঞতা দেখাবে।',
           ),
         ),
         const SizedBox(height: 14),
@@ -1170,8 +1170,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     child: Text(
                       _t(
-                        'Muslim prayer time, mosque, jamaat and Islamic alarms stay hidden. You can create only your own manual reminder.',
-                        'মুসলিম নামাজের সময়, মসজিদ, জামাত ও ইসলামিক অ্যালার্ম দেখানো হবে না। আপনি শুধু নিজের ম্যানুয়াল রিমাইন্ডার তৈরি করতে পারবেন।',
+                        'Only reminders you create will be used for this profile. Nothing is added automatically.',
+                        'এই প্রোফাইলে শুধু আপনার তৈরি রিমাইন্ডার ব্যবহার হবে। কোনো কনটেন্ট বা অ্যালার্ম নিজে থেকে যোগ হবে না।',
                       ),
                       style: const TextStyle(height: 1.4),
                     ),
@@ -1184,8 +1184,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         setState(() => _manualReminderRequested = value),
                     title: Text(
                       _t(
-                        'Create a manual prayer or spiritual reminder?',
-                        'ম্যানুয়াল প্রার্থনা বা আধ্যাত্মিক রিমাইন্ডার তৈরি করবেন?',
+                        'Create a personal or spiritual reminder?',
+                        'ব্যক্তিগত বা আধ্যাত্মিক রিমাইন্ডার তৈরি করবেন?',
                       ),
                     ),
                     subtitle: Text(
@@ -1202,7 +1202,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       maxLength: 80,
                       decoration: InputDecoration(
                         labelText: _t('Reminder name', 'রিমাইন্ডারের নাম'),
-                        hintText: _t('Evening prayer', 'সন্ধ্যার প্রার্থনা'),
+                        hintText: _t(
+                          'Evening reflection',
+                          'সন্ধ্যার ধ্যান বা ভাবনা',
+                        ),
                         prefixIcon: const Icon(
                           Icons.edit_notifications_outlined,
                         ),
@@ -1420,6 +1423,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildPermissionsStep() {
+    final islam = _religion == 'islam';
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1427,18 +1432,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           icon: Icons.admin_panel_settings_outlined,
           title: _t('Choose permission setup', 'অনুমতির ধরন নির্বাচন করুন'),
           text: _t(
-            'Permissions and feature activation are separate. Enabling permissions never turns on prayer alarms by itself.',
-            'অনুমতি ও ফিচার চালু করা আলাদা বিষয়। অনুমতি দিলেই নামাজ বা অন্য অ্যালার্ম নিজে থেকে চালু হবে না।',
+            'Permissions and feature activation are separate. Granting permission never turns on a reminder or alarm by itself.',
+            'অনুমতি ও ফিচার চালু করা আলাদা বিষয়। অনুমতি দিলেই কোনো রিমাইন্ডার বা অ্যালার্ম নিজে থেকে চালু হবে না।',
           ),
         ),
         const SizedBox(height: 14),
         _permissionOption(
           value: 'enable_all',
           title: _t('Enable all needed permissions', 'প্রয়োজনীয় সব অনুমতি দিন'),
-          subtitle: _t(
-            'Guided requests for notifications, activity and Usage Access. Location is requested only for Islamic prayer times. Exact alarm is requested only for an enabled alarm.',
-            'নোটিফিকেশন, কার্যক্রম ও Usage Access-এর ধাপ দেখানো হবে। লোকেশন শুধু ইসলামিক নামাজের সময়ের জন্য এবং Exact Alarm শুধু চালু অ্যালার্মের জন্য চাওয়া হবে।',
-          ),
+          subtitle: islam
+              ? _t(
+                  'Guided requests for notifications, activity and Usage Access. Location is requested only for Islamic prayer times. Exact Alarm is requested only for an alarm you enable.',
+                  'নোটিফিকেশন, কার্যক্রম ও Usage Access-এর ধাপ দেখানো হবে। লোকেশন শুধু ইসলামিক নামাজের সময়ের জন্য এবং Exact Alarm শুধু আপনি চালু করা অ্যালার্মের জন্য চাওয়া হবে।',
+                )
+              : _t(
+                  'Guided requests for notifications, activity and Usage Access. Location is not requested for this profile. Exact Alarm is requested only for a reminder or alarm you enable.',
+                  'নোটিফিকেশন, কার্যক্রম ও Usage Access-এর ধাপ দেখানো হবে। এই প্রোফাইলে লোকেশন চাওয়া হবে না। Exact Alarm শুধু আপনি চালু করা রিমাইন্ডার বা অ্যালার্মের জন্য চাওয়া হবে।',
+                ),
           icon: Icons.done_all_rounded,
           onTap: _enableAllNeededPermissions,
         ),

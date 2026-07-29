@@ -235,8 +235,8 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                         if (!hiddenFaith) const SizedBox(height: 7),
                         Text(
                           _t(
-                            'Only reminders you create manually are shown here. Muslim prayer times, mosque and jamaat content are hidden.',
-                            'এখানে শুধু আপনার তৈরি ম্যানুয়াল রিমাইন্ডার দেখা যাবে। মুসলিম নামাজের সময়, মসজিদ ও জামাতের তথ্য লুকানো থাকবে।',
+                            'Only reminders you create are shown here. Nothing is added automatically.',
+                            'এখানে শুধু আপনার তৈরি রিমাইন্ডার দেখা যাবে। কোনো কনটেন্ট বা অ্যালার্ম নিজে থেকে যোগ হবে না।',
                           ),
                           style: const TextStyle(height: 1.4),
                         ),
@@ -292,8 +292,8 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                             const SizedBox(height: 8),
                             Text(
                               _t(
-                                'Add a personal prayer, spiritual practice or general reminder.',
-                                'নিজের প্রার্থনা, আধ্যাত্মিক চর্চা বা সাধারণ রিমাইন্ডার যোগ করুন।',
+                                'Add a personal, spiritual or general reminder.',
+                                'ব্যক্তিগত, আধ্যাত্মিক বা সাধারণ রিমাইন্ডার যোগ করুন।',
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -511,7 +511,7 @@ class _ReminderEditorState extends State<_ReminderEditor> {
               maxLength: 80,
               decoration: InputDecoration(
                 labelText: _t('Reminder name', 'রিমাইন্ডারের নাম'),
-                hintText: _t('Evening prayer', 'সন্ধ্যার প্রার্থনা'),
+                hintText: _t('Evening reflection', 'সন্ধ্যার ধ্যান বা ভাবনা'),
               ),
             ),
             const SizedBox(height: 8),
