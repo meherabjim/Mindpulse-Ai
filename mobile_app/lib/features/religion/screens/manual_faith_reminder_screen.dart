@@ -33,6 +33,11 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
     return AppPreferencesController.instance.text(english, bangla);
   }
 
+  bool get _usesPrayerLanguage {
+    return widget.faithProfile.religion != 'no_religion' &&
+        widget.faithProfile.religion != 'prefer_not_to_say';
+  }
+
   Future<void> _load() async {
     try {
       final reminders = await _service.load();
@@ -132,7 +137,10 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
 
     final result = await showDialog<ManualFaithReminder>(
       context: context,
-      builder: (_) => _ReminderEditor(reminder: existing),
+      builder: (_) => _ReminderEditor(
+        reminder: existing,
+        usesPrayerLanguage: _usesPrayerLanguage,
+      ),
     );
 
     if (result == null) return;
@@ -196,7 +204,11 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_t('Manual reminders', 'ম্যানুয়াল রিমাইন্ডার')),
+        title: Text(
+          _usesPrayerLanguage
+              ? _t('Prayer', 'প্রার্থনা')
+              : _t('Reminders', 'রিমাইন্ডার'),
+        ),
         actions: [
           IconButton(
             tooltip: _t('Add reminder', 'রিমাইন্ডার যোগ করুন'),
@@ -234,10 +246,15 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                           ),
                         if (!hiddenFaith) const SizedBox(height: 7),
                         Text(
-                          _t(
-                            'Only reminders you create are shown here. Nothing is added automatically.',
-                            'এখানে শুধু আপনার তৈরি রিমাইন্ডার দেখা যাবে। কোনো কনটেন্ট বা অ্যালার্ম নিজে থেকে যোগ হবে না।',
-                          ),
+                          _usesPrayerLanguage
+                              ? _t(
+                                  'Create your own prayer and spiritual reminders. Nothing is added automatically.',
+                                  'নিজের প্রার্থনা ও আধ্যাত্মিক রিমাইন্ডার তৈরি করুন। কোনো কিছু নিজে থেকে যোগ হবে না।',
+                                )
+                              : _t(
+                                  'Only reminders you create are shown here. Nothing is added automatically.',
+                                  'এখানে শুধু আপনার তৈরি রিমাইন্ডার দেখা যাবে। কোনো কিছু নিজে থেকে যোগ হবে না।',
+                                ),
                           style: const TextStyle(height: 1.4),
                         ),
                       ],
@@ -277,13 +294,23 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                         padding: const EdgeInsets.all(22),
                         child: Column(
                           children: [
-                            const Icon(Icons.alarm_add_outlined, size: 52),
+                            Icon(
+                              _usesPrayerLanguage
+                                  ? Icons.self_improvement_rounded
+                                  : Icons.alarm_add_outlined,
+                              size: 52,
+                            ),
                             const SizedBox(height: 12),
                             Text(
-                              _t(
-                                'No manual reminder yet',
-                                'এখনও কোনো ম্যানুয়াল রিমাইন্ডার নেই',
-                              ),
+                              _usesPrayerLanguage
+                                  ? _t(
+                                      'No prayer reminder yet',
+                                      'এখনও কোনো প্রার্থনার রিমাইন্ডার নেই',
+                                    )
+                                  : _t(
+                                      'No reminder yet',
+                                      'এখনও কোনো রিমাইন্ডার নেই',
+                                    ),
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w900,
@@ -291,10 +318,15 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _t(
-                                'Add a personal, spiritual or general reminder.',
-                                'ব্যক্তিগত, আধ্যাত্মিক বা সাধারণ রিমাইন্ডার যোগ করুন।',
-                              ),
+                              _usesPrayerLanguage
+                                  ? _t(
+                                      'Add a prayer or spiritual practice and choose its time.',
+                                      'একটি প্রার্থনা বা আধ্যাত্মিক চর্চা যোগ করে সময় নির্বাচন করুন।',
+                                    )
+                                  : _t(
+                                      'Add a personal reminder and choose its time.',
+                                      'একটি ব্যক্তিগত রিমাইন্ডার যোগ করে সময় নির্বাচন করুন।',
+                                    ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 14),
@@ -302,10 +334,12 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                               onPressed: _saving ? null : () => _openEditor(),
                               icon: const Icon(Icons.add_alarm_rounded),
                               label: Text(
-                                _t(
-                                  'Add manual reminder',
-                                  'ম্যানুয়াল রিমাইন্ডার যোগ করুন',
-                                ),
+                                _usesPrayerLanguage
+                                    ? _t(
+                                        'Add prayer reminder',
+                                        'প্রার্থনার রিমাইন্ডার যোগ করুন',
+                                      )
+                                    : _t('Add reminder', 'রিমাইন্ডার যোগ করুন'),
                               ),
                             ),
                           ],
@@ -316,8 +350,10 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
                     ..._reminders.map(
                       (reminder) => Card(
                         child: ListTile(
-                          leading: const Icon(
-                            Icons.notifications_active_outlined,
+                          leading: Icon(
+                            _usesPrayerLanguage
+                                ? Icons.self_improvement_rounded
+                                : Icons.notifications_active_outlined,
                           ),
                           title: Text(
                             reminder.title,
@@ -389,8 +425,9 @@ class _ManualFaithReminderScreenState extends State<ManualFaithReminderScreen> {
 }
 
 class _ReminderEditor extends StatefulWidget {
-  const _ReminderEditor({this.reminder});
+  const _ReminderEditor({required this.usesPrayerLanguage, this.reminder});
 
+  final bool usesPrayerLanguage;
   final ManualFaithReminder? reminder;
 
   @override
@@ -497,8 +534,15 @@ class _ReminderEditorState extends State<_ReminderEditor> {
 
     return AlertDialog(
       title: Text(
-        widget.reminder == null
-            ? _t('Add manual reminder', 'ম্যানুয়াল রিমাইন্ডার যোগ করুন')
+        widget.usesPrayerLanguage
+            ? widget.reminder == null
+                  ? _t('Add prayer reminder', 'প্রার্থনার রিমাইন্ডার যোগ করুন')
+                  : _t(
+                      'Edit prayer reminder',
+                      'প্রার্থনার রিমাইন্ডার সম্পাদনা করুন',
+                    )
+            : widget.reminder == null
+            ? _t('Add reminder', 'রিমাইন্ডার যোগ করুন')
             : _t('Edit reminder', 'রিমাইন্ডার সম্পাদনা করুন'),
       ),
       content: SingleChildScrollView(
@@ -510,8 +554,12 @@ class _ReminderEditorState extends State<_ReminderEditor> {
               controller: _titleController,
               maxLength: 80,
               decoration: InputDecoration(
-                labelText: _t('Reminder name', 'রিমাইন্ডারের নাম'),
-                hintText: _t('Evening reflection', 'সন্ধ্যার ধ্যান বা ভাবনা'),
+                labelText: widget.usesPrayerLanguage
+                    ? _t('Prayer name', 'প্রার্থনার নাম')
+                    : _t('Reminder name', 'রিমাইন্ডারের নাম'),
+                hintText: widget.usesPrayerLanguage
+                    ? _t('Evening prayer', 'সন্ধ্যার প্রার্থনা')
+                    : _t('Personal reminder', 'ব্যক্তিগত রিমাইন্ডার'),
               ),
             ),
             const SizedBox(height: 8),

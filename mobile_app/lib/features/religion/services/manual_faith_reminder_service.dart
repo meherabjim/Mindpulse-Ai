@@ -169,6 +169,39 @@ class ManualFaithReminderService {
     ]);
   }
 
+  String _englishTime(ManualFaithReminder reminder) {
+    final hour12 = reminder.hour % 12 == 0 ? 12 : reminder.hour % 12;
+    final minute = reminder.minute.toString().padLeft(2, '0');
+    final period = reminder.hour >= 12 ? 'PM' : 'AM';
+    return '$hour12:$minute $period';
+  }
+
+  String _banglaDigits(int value) {
+    const digits = <String>['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return value.toString().split('').map((item) {
+      final digit = int.tryParse(item);
+      return digit == null ? item : digits[digit];
+    }).join();
+  }
+
+  String _banglaTime(ManualFaithReminder reminder) {
+    var period = 'রাত';
+    if (reminder.hour >= 5 && reminder.hour < 12) {
+      period = 'সকাল';
+    } else if (reminder.hour >= 12 && reminder.hour < 16) {
+      period = 'দুপুর';
+    } else if (reminder.hour >= 16 && reminder.hour < 19) {
+      period = 'বিকেল';
+    }
+
+    final hour12 = reminder.hour % 12 == 0 ? 12 : reminder.hour % 12;
+    final minute = reminder.minute == 0
+        ? ''
+        : ' ${_banglaDigits(reminder.minute)} মিনিট';
+
+    return '$period ${_banglaDigits(hour12)}টা$minute';
+  }
+
   Map<String, Object?> _alarmPayload({
     required int id,
     required ManualFaithReminder reminder,
@@ -182,8 +215,16 @@ class ManualFaithReminderService {
       'message': test
           ? 'MindPulse reminder test.'
           : 'Your reminder is due now.',
-      'voiceBn': 'এখন ${reminder.title} করার সময় হয়েছে।',
-      'voiceEn': 'It is time for ${reminder.title}.',
+      'voiceBn': test
+          ? 'এটি MindPulse-এর পরীক্ষামূলক রিমাইন্ডার। '
+                '${reminder.title} নির্ধারিত হয়েছে ${_banglaTime(reminder)}।'
+          : 'এখন সময় ${_banglaTime(reminder)}। '
+                '${reminder.title} করার সময় হয়েছে।',
+      'voiceEn': test
+          ? 'This is a MindPulse test reminder. '
+                '${reminder.title} is scheduled for ${_englishTime(reminder)}.'
+          : 'It is now ${_englishTime(reminder)}. '
+                'It is time for ${reminder.title}.',
       'prayerBn': '',
       'prayerEn': '',
       'durationSeconds': 15,

@@ -87,6 +87,22 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final faith = _faithProfile!;
+    final hasNamedFaith =
+        faith.religion != 'no_religion' &&
+        faith.religion != 'prefer_not_to_say';
+    final faithIcon = faith.isIslam
+        ? Icons.mosque_outlined
+        : hasNamedFaith
+        ? Icons.self_improvement_rounded
+        : Icons.notifications_none_rounded;
+    final selectedFaithIcon = faith.isIslam
+        ? Icons.mosque_rounded
+        : hasNamedFaith
+        ? Icons.self_improvement_rounded
+        : Icons.notifications_rounded;
+    final faithLabel = hasNamedFaith
+        ? _t('Prayer', 'প্রার্থনা')
+        : _t('Reminder', 'রিমাইন্ডার');
     final pages = <Widget>[
       DashboardHomeTab(
         key: _homeKey,
@@ -138,18 +154,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             selectedIcon: const Icon(Icons.auto_awesome),
             label: _t('AI Wellness', 'AI ওয়েলনেস'),
           ),
-          if (faith.isIslam)
-            NavigationDestination(
-              icon: const Icon(Icons.mosque_outlined),
-              selectedIcon: const Icon(Icons.mosque_rounded),
-              label: _t('Prayer', 'নামাজ'),
-            )
-          else
-            NavigationDestination(
-              icon: const Icon(Icons.alarm_outlined),
-              selectedIcon: const Icon(Icons.alarm_rounded),
-              label: _t('Reminders', 'রিমাইন্ডার'),
-            ),
+          NavigationDestination(
+            icon: Icon(faithIcon),
+            selectedIcon: Icon(selectedFaithIcon),
+            label: faithLabel,
+          ),
           NavigationDestination(
             icon: const Icon(Icons.person_outline_rounded),
             selectedIcon: const Icon(Icons.person_rounded),
@@ -379,6 +388,14 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
 
   Widget _buildFaithCard(BuildContext context) {
     final faith = widget.faithProfile;
+    final hasNamedFaith =
+        faith.religion != 'no_religion' &&
+        faith.religion != 'prefer_not_to_say';
+    final faithIcon = faith.isIslam
+        ? Icons.mosque_outlined
+        : hasNamedFaith
+        ? Icons.self_improvement_rounded
+        : Icons.notifications_none_rounded;
     final reminder = _nextManualReminder;
     final timeText = reminder == null
         ? null
@@ -396,11 +413,7 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                faith.isIslam ? Icons.mosque_outlined : Icons.alarm_outlined,
-                color: const Color(0xFF6059E8),
-                size: 30,
-              ),
+              Icon(faithIcon, color: const Color(0xFF6059E8), size: 30),
               const SizedBox(width: 13),
               Expanded(
                 child: Column(
@@ -421,31 +434,41 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                       Text(
                         _t(
                           'Prayer times and alarm settings are available in the Prayer tab. Alarm sound follows your On/Off choice.',
-                          'নামাজের সময় ও অ্যালার্ম সেটিংস নামাজ ট্যাবে দেখা যাবে। আপনার On/Off পছন্দ অনুযায়ী অ্যালার্ম বাজবে।',
+                          'নামাজের সময় ও অ্যালার্ম সেটিংস প্রার্থনা ট্যাবে দেখা যাবে। আপনার On/Off পছন্দ অনুযায়ী অ্যালার্ম বাজবে।',
                         ),
                         style: const TextStyle(height: 1.4),
                       )
                     else if (reminder != null)
                       Text(
-                        _t(
-                          'Next manual reminder: ${reminder.title} • $timeText',
-                          'পরবর্তী ম্যানুয়াল রিমাইন্ডার: ${reminder.title} • $timeText',
-                        ),
+                        hasNamedFaith
+                            ? _t(
+                                'Next prayer reminder: ${reminder.title} • $timeText',
+                                'পরবর্তী প্রার্থনার রিমাইন্ডার: ${reminder.title} • $timeText',
+                              )
+                            : _t(
+                                'Next reminder: ${reminder.title} • $timeText',
+                                'পরবর্তী রিমাইন্ডার: ${reminder.title} • $timeText',
+                              ),
                         style: const TextStyle(height: 1.4),
                       )
                     else
                       Text(
-                        _t(
-                          'No active manual reminder. Open Reminders to create or enable one. Muslim prayer content is hidden.',
-                          'কোনো চালু ম্যানুয়াল রিমাইন্ডার নেই। নতুন রিমাইন্ডার তৈরি বা চালু করতে রিমাইন্ডার ট্যাব খুলুন। মুসলিম নামাজের তথ্য লুকানো আছে।',
-                        ),
+                        hasNamedFaith
+                            ? _t(
+                                'No active prayer reminder. Open Prayer to create or enable one.',
+                                'কোনো চালু প্রার্থনার রিমাইন্ডার নেই। তৈরি বা চালু করতে প্রার্থনা ট্যাব খুলুন।',
+                              )
+                            : _t(
+                                'No active reminder. Open Reminder to create or enable one.',
+                                'কোনো চালু রিমাইন্ডার নেই। তৈরি বা চালু করতে রিমাইন্ডার ট্যাব খুলুন।',
+                              ),
                         style: const TextStyle(height: 1.4),
                       ),
                     const SizedBox(height: 10),
                     Text(
-                      faith.isIslam
-                          ? _t('Open Prayer', 'নামাজ খুলুন')
-                          : _t('Open Reminders', 'রিমাইন্ডার খুলুন'),
+                      hasNamedFaith
+                          ? _t('Open Prayer', 'প্রার্থনা খুলুন')
+                          : _t('Open Reminder', 'রিমাইন্ডার খুলুন'),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w800,

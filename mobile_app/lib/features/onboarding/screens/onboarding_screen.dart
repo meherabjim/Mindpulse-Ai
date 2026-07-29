@@ -1100,6 +1100,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildReligionStep() {
     final islam = _religion == 'islam';
     final other = _religion == 'other';
+    final usesPrayerLanguage =
+        _religion != 'no_religion' && _religion != 'prefer_not_to_say';
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1107,8 +1110,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           icon: Icons.self_improvement_outlined,
           title: _t('Religion and reminders', 'ধর্ম ও রিমাইন্ডার'),
           text: _t(
-            'MindPulse shows only the faith and reminder experience that matches your choice.',
-            'MindPulse শুধু আপনার পছন্দ অনুযায়ী ধর্ম ও রিমাইন্ডারের অভিজ্ঞতা দেখাবে।',
+            'MindPulse shows the prayer and reminder experience that matches your choice.',
+            'MindPulse আপনার পছন্দ অনুযায়ী প্রার্থনা ও রিমাইন্ডারের অভিজ্ঞতা দেখাবে।',
           ),
         ),
         const SizedBox(height: 14),
@@ -1169,10 +1172,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Text(
-                      _t(
-                        'Only reminders you create will be used for this profile. Nothing is added automatically.',
-                        'এই প্রোফাইলে শুধু আপনার তৈরি রিমাইন্ডার ব্যবহার হবে। কোনো কনটেন্ট বা অ্যালার্ম নিজে থেকে যোগ হবে না।',
-                      ),
+                      usesPrayerLanguage
+                          ? _t(
+                              'Create only the prayer or spiritual reminders you choose. Nothing is added automatically.',
+                              'শুধু আপনার পছন্দের প্রার্থনা বা আধ্যাত্মিক রিমাইন্ডার তৈরি করুন। কোনো কিছু নিজে থেকে যোগ হবে না।',
+                            )
+                          : _t(
+                              'Only reminders you create will be used for this profile. Nothing is added automatically.',
+                              'এই প্রোফাইলে শুধু আপনার তৈরি রিমাইন্ডার ব্যবহার হবে। কোনো কিছু নিজে থেকে যোগ হবে না।',
+                            ),
                       style: const TextStyle(height: 1.4),
                     ),
                   ),
@@ -1183,10 +1191,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onChanged: (value) =>
                         setState(() => _manualReminderRequested = value),
                     title: Text(
-                      _t(
-                        'Create a personal or spiritual reminder?',
-                        'ব্যক্তিগত বা আধ্যাত্মিক রিমাইন্ডার তৈরি করবেন?',
-                      ),
+                      usesPrayerLanguage
+                          ? _t(
+                              'Create a prayer or spiritual reminder?',
+                              'প্রার্থনা বা আধ্যাত্মিক রিমাইন্ডার তৈরি করবেন?',
+                            )
+                          : _t(
+                              'Create a personal reminder?',
+                              'ব্যক্তিগত রিমাইন্ডার তৈরি করবেন?',
+                            ),
                     ),
                     subtitle: Text(
                       _t(
@@ -1201,13 +1214,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       controller: _manualReminderTitleController,
                       maxLength: 80,
                       decoration: InputDecoration(
-                        labelText: _t('Reminder name', 'রিমাইন্ডারের নাম'),
-                        hintText: _t(
-                          'Evening reflection',
-                          'সন্ধ্যার ধ্যান বা ভাবনা',
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.edit_notifications_outlined,
+                        labelText: usesPrayerLanguage
+                            ? _t('Prayer name', 'প্রার্থনার নাম')
+                            : _t('Reminder name', 'রিমাইন্ডারের নাম'),
+                        hintText: usesPrayerLanguage
+                            ? _t('Evening prayer', 'সন্ধ্যার প্রার্থনা')
+                            : _t('Personal reminder', 'ব্যক্তিগত রিমাইন্ডার'),
+                        prefixIcon: Icon(
+                          usesPrayerLanguage
+                              ? Icons.self_improvement_rounded
+                              : Icons.edit_notifications_outlined,
                         ),
                       ),
                     ),
@@ -1432,8 +1448,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           icon: Icons.admin_panel_settings_outlined,
           title: _t('Choose permission setup', 'অনুমতির ধরন নির্বাচন করুন'),
           text: _t(
-            'Permissions and feature activation are separate. Granting permission never turns on a reminder or alarm by itself.',
-            'অনুমতি ও ফিচার চালু করা আলাদা বিষয়। অনুমতি দিলেই কোনো রিমাইন্ডার বা অ্যালার্ম নিজে থেকে চালু হবে না।',
+            'Permissions and feature activation are separate. Granting permission never turns on a prayer or reminder alarm by itself.',
+            'অনুমতি ও ফিচার চালু করা আলাদা বিষয়। অনুমতি দিলেই কোনো প্রার্থনা বা রিমাইন্ডার অ্যালার্ম নিজে থেকে চালু হবে না।',
           ),
         ),
         const SizedBox(height: 14),
@@ -1446,8 +1462,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   'নোটিফিকেশন, কার্যক্রম ও Usage Access-এর ধাপ দেখানো হবে। লোকেশন শুধু ইসলামিক নামাজের সময়ের জন্য এবং Exact Alarm শুধু আপনি চালু করা অ্যালার্মের জন্য চাওয়া হবে।',
                 )
               : _t(
-                  'Guided requests for notifications, activity and Usage Access. Location is not requested for this profile. Exact Alarm is requested only for a reminder or alarm you enable.',
-                  'নোটিফিকেশন, কার্যক্রম ও Usage Access-এর ধাপ দেখানো হবে। এই প্রোফাইলে লোকেশন চাওয়া হবে না। Exact Alarm শুধু আপনি চালু করা রিমাইন্ডার বা অ্যালার্মের জন্য চাওয়া হবে।',
+                  'Guided requests for notifications, activity and Usage Access. Location is not requested for this profile. Exact Alarm is requested only for a prayer or reminder alarm you enable.',
+                  'নোটিফিকেশন, কার্যক্রম ও Usage Access-এর ধাপ দেখানো হবে। এই প্রোফাইলে লোকেশন চাওয়া হবে না। Exact Alarm শুধু আপনি চালু করা প্রার্থনা বা রিমাইন্ডার অ্যালার্মের জন্য চাওয়া হবে।',
                 ),
           icon: Icons.done_all_rounded,
           onTap: _enableAllNeededPermissions,
