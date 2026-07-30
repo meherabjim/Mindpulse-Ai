@@ -190,7 +190,7 @@ class DashboardHomeTab extends StatefulWidget {
 class _DashboardHomeTabState extends State<DashboardHomeTab>
     with WidgetsBindingObserver {
   static const _scheduleKey = 'mindpulse_my_day_schedule_v1';
-  static const _bookGuideKey = 'mindpulse_book_guide_v1';
+  static const _bookGuideKey = 'mindpulse_ai_guide_items_v2';
 
   final WellnessScanService _wellnessService = WellnessScanService();
 
@@ -598,10 +598,10 @@ class _DashboardHomeTabState extends State<DashboardHomeTab>
                 iconColor: const Color(0xFF0D9E91),
                 title: _t('AI guide', 'AI গাইড'),
                 value: _bookCount == 0
-                    ? _t('Create 10-book plan', '১০ বইয়ের plan তৈরি করুন')
+                    ? _t('Create reading guide', 'পাঠ গাইড তৈরি করুন')
                     : _t(
-                        '$_bookCount books planned',
-                        '$_bookCountটি বই সাজানো',
+                        '$_bookCount reading items selected',
+                        '$_bookCountটি পাঠ্য নির্বাচিত',
                       ),
                 onTap: widget.onOpenMyDay,
               ),
