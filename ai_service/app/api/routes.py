@@ -13,12 +13,18 @@ from app.models.schemas import (
     WellnessMLPredictionResponse,
     WellnessRecommendationRequest,
     WellnessRecommendationResponse,
+    ReadingPlanRequest,
+    ReadingPlanResponse,
 )
 
 from app.services.engine import (
     analyze_journal,
     assess_safety,
     wellness_recommendation,
+)
+
+from app.services.reading_plan import (
+    generate_reading_plan,
 )
 
 from app.services.prediction_service import (
@@ -71,6 +77,18 @@ async def recommendation(
     request: WellnessRecommendationRequest,
 ) -> WellnessRecommendationResponse:
     return wellness_recommendation(
+        request
+    )
+
+
+@router.post(
+    "/reading/plan",
+    response_model=ReadingPlanResponse,
+)
+async def reading_plan(
+    request: ReadingPlanRequest,
+) -> ReadingPlanResponse:
+    return generate_reading_plan(
         request
     )
 

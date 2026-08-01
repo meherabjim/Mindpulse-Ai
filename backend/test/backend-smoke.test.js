@@ -537,3 +537,34 @@ corsPolicyTest(
     );
   },
 );
+
+test(
+  'reading plan route is protected',
+  async () => {
+    const response = await requestApp(
+      '/api/v1/ai/reading/plan',
+      { method: 'POST' },
+    );
+
+    assert.ok(
+      response.statusCode === 401
+      || response.statusCode === 403,
+      response.bodyText,
+    );
+  },
+);
+
+
+test(
+  'AI service exports the reading-plan proxy',
+  () => {
+    const service = require(
+      '../src/services/ai.service',
+    );
+
+    assert.equal(
+      typeof service.generateReadingPlan,
+      'function',
+    );
+  },
+);

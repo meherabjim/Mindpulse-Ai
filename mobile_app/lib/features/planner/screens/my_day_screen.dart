@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/settings/app_preferences_controller.dart';
 import '../../digital_wellbeing/screens/mindful_screen_time_screen.dart';
 import '../../reminders/screens/smart_reminder_center_screen.dart';
-import 'ai_guide_v2_screen.dart';
+import 'ai_guide_v3_screen.dart';
 
 class MyDayScreen extends StatelessWidget {
   const MyDayScreen({super.key});
@@ -133,7 +133,7 @@ class MyDayScreen extends StatelessWidget {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const AiGuideV2Screen(),
+                              builder: (_) => const AiGuideV3Screen(),
                             ),
                           );
                         },

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../../core/auth/authenticated_http_client.dart';
+import '../../planner/models/reading_plan_models.dart';
 
 class AiApiException implements Exception {
   const AiApiException(this.message);
@@ -88,6 +89,25 @@ class AiMobileService {
         'hydration_cups': hydrationCups,
         'social_withdrawal': socialWithdrawal,
       },
+    );
+  }
+
+  Future<ReadingPlanResponseModel> generateReadingPlan(
+    ReadingPlanRequestModel request,
+  ) async {
+    final response = await _authorizedRequest(
+      method: 'POST',
+      path: '/ai/reading/plan',
+      body: request.toJson(),
+    );
+
+    final rawData = response['data'];
+    if (rawData is! Map) {
+      throw const AiApiException('The reading-plan response is incomplete.');
+    }
+
+    return ReadingPlanResponseModel.fromJson(
+      Map<String, dynamic>.from(rawData),
     );
   }
 

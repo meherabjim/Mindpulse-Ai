@@ -1,4 +1,4 @@
-﻿const aiService = require(
+const aiService = require(
     "../services/ai.service"
 );
 
@@ -684,10 +684,251 @@ async function predictWellness(
 }
 
 
+function normalizeReadingPlanPayload(body) {
+    const profile =
+        body &&
+        typeof body.profile === "object" &&
+        !Array.isArray(body.profile)
+            ? body.profile
+            : null;
+
+    const availability =
+        body &&
+        typeof body.availability === "object" &&
+        !Array.isArray(body.availability)
+            ? body.availability
+            : null;
+
+    const items =
+        Array.isArray(body?.items)
+            ? body.items
+            : [];
+
+    if (!profile) {
+        const error = new Error(
+            "A learning profile is required."
+        );
+        error.statusCode = 400;
+        error.code = "READING_PROFILE_REQUIRED";
+        throw error;
+    }
+
+    if (!availability) {
+        const error = new Error(
+            "Reading availability is required."
+        );
+        error.statusCode = 400;
+        error.code = "READING_AVAILABILITY_REQUIRED";
+        throw error;
+    }
+
+    if (
+        items.length < 1 ||
+        items.length > 30
+    ) {
+        const error = new Error(
+            "Select between 1 and 30 reading items."
+        );
+        error.statusCode = 400;
+        error.code = "READING_ITEM_COUNT_INVALID";
+        throw error;
+    }
+
+    const invalidItem = items.find(
+        (item) =>
+            !item ||
+            typeof item !== "object" ||
+            Array.isArray(item) ||
+            typeof item.id !== "string" ||
+            !item.id.trim() ||
+            typeof item.title !== "string" ||
+            !item.title.trim()
+    );
+
+    if (invalidItem) {
+        const error = new Error(
+            "Every reading item needs an id and title."
+        );
+        error.statusCode = 400;
+        error.code = "READING_ITEM_INVALID";
+        throw error;
+    }
+
+    return {
+        profile,
+        items,
+        availability,
+        goal:
+            typeof body.goal === "string" &&
+            body.goal.trim()
+                ? body.goal.trim()
+                : "general_reading",
+        target_date:
+            typeof body.target_date === "string" &&
+            body.target_date.trim()
+                ? body.target_date.trim()
+                : null,
+    };
+}
+
+
+async function generateReadingPlan(
+    req,
+    res
+) {
+    const startedAt = Date.now();
+    const userId =
+        getAuthenticatedUserId(req);
+
+    let payload;
+
+    try {
+        payload =
+            normalizeReadingPlanPayload(
+                req.body || {}
+            );
+    } catch (error) {
+        return sendAiError(
+            res,
+            error
+        );
+    }
+
+    const typeCounts = {};
+
+    for (const item of payload.items) {
+        const type =
+            typeof item.type === "string"
+                ? item.type
+                : "unknown";
+
+        typeCounts[type] =
+            (typeCounts[type] || 0) + 1;
+    }
+
+    const requestSummary = {
+        education_system:
+            payload.profile
+                .education_system ||
+            null,
+        education_level:
+            payload.profile
+                .education_level ||
+            null,
+        class_or_year:
+            payload.profile
+                .class_or_year ||
+            null,
+        stream:
+            payload.profile
+                .stream ||
+            null,
+        subject_count:
+            Array.isArray(
+                payload.profile.subjects
+            )
+                ? payload.profile
+                      .subjects.length
+                : 0,
+        item_count:
+            payload.items.length,
+        item_type_counts:
+            typeCounts,
+        sessions_per_week:
+            payload.availability
+                .sessions_per_week ||
+            null,
+        has_target_date:
+            Boolean(
+                payload.target_date
+            ),
+    };
+
+    try {
+        const result =
+            await aiService
+                .generateReadingPlan(
+                    payload
+                );
+
+        const processingTimeMs =
+            Date.now() -
+            startedAt;
+
+        const log =
+            await writeLogSafely({
+                userId,
+                analysisType:
+                    "reading_plan",
+                requestSummary,
+                responseSummary: {
+                    plan_id:
+                        result.plan_id ||
+                        null,
+                    engine:
+                        result.engine ||
+                        null,
+                    session_count:
+                        Array.isArray(
+                            result.sessions
+                        )
+                            ? result
+                                  .sessions
+                                  .length
+                            : 0,
+                    overall_confidence:
+                        result
+                            .overall_confidence ??
+                        null,
+                },
+                success: true,
+                processingTimeMs,
+            });
+
+        return sendSuccess(
+            res,
+            "Reading plan generated.",
+            result,
+            {
+                user_id: userId,
+                response_time_ms:
+                    processingTimeMs,
+                engine:
+                    result.engine ||
+                    "mindpulse-transparent-reading-plan-v1",
+                log_id:
+                    log?.id ??
+                    null,
+            }
+        );
+    } catch (error) {
+        await writeLogSafely({
+            userId,
+            analysisType:
+                "reading_plan",
+            requestSummary,
+            success: false,
+            errorCode:
+                error.code ||
+                "AI_SERVICE_ERROR",
+            processingTimeMs:
+                Date.now() -
+                startedAt,
+        });
+
+        return sendAiError(
+            res,
+            error
+        );
+    }
+}
+
+
 module.exports = {
     health,
     analyzeJournal,
     checkSafety,
     getRecommendations,
     predictWellness,
+    generateReadingPlan,
 };

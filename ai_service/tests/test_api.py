@@ -439,3 +439,140 @@ def test_portable_json_models_are_active() -> None:
         assert abs(
             probability_sum - 1.0
         ) <= 0.001
+
+
+def test_reading_plan_is_explainable_and_flexible() -> None:
+    response = client.post(
+        "/api/v1/reading/plan",
+        headers=HEADERS,
+        json={
+            "profile": {
+                "education_system": "general",
+                "education_level": "higher_secondary",
+                "class_or_year": "hsc_1",
+                "stream": "science",
+                "board_or_curriculum": "Dhaka Board",
+                "degree": "",
+                "major": "",
+                "semester": "",
+                "subjects": ["Physics", "Chemistry"],
+                "preferred_language": "bn",
+            },
+            "items": [
+                {
+                    "id": "physics-book",
+                    "type": "textbook",
+                    "title": "Physics First Paper",
+                    "author": "",
+                    "publisher": "",
+                    "published_date": "",
+                    "subject": "Physics",
+                    "language": "bn",
+                    "identifier": "",
+                    "source": "nctb",
+                    "source_url": "",
+                    "user_difficulty": "unknown",
+                    "priority": 5,
+                },
+                {
+                    "id": "science-magazine",
+                    "type": "magazine",
+                    "title": "Science Magazine",
+                    "author": "",
+                    "publisher": "",
+                    "published_date": "",
+                    "subject": "Science",
+                    "language": "en",
+                    "identifier": "",
+                    "source": "google_books",
+                    "source_url": "",
+                    "user_difficulty": "easy",
+                    "priority": 2,
+                },
+                {
+                    "id": "research-paper",
+                    "type": "research_paper",
+                    "title": "A Research Paper",
+                    "author": "Researcher",
+                    "publisher": "Journal",
+                    "published_date": "2025",
+                    "subject": "Physics",
+                    "language": "en",
+                    "identifier": "10.1000/example",
+                    "source": "crossref",
+                    "source_url": "",
+                    "user_difficulty": "hard",
+                    "priority": 4,
+                },
+            ],
+            "availability": {
+                "session_minutes": 40,
+                "sessions_per_week": 4,
+                "preferred_days": ["mon", "wed", "fri", "sat"],
+                "preferred_start_minutes": 1140,
+            },
+            "goal": "exam",
+            "target_date": "2026-12-15",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+
+    assert data["engine"] == "mindpulse-transparent-reading-plan-v1"
+    assert len(data["sessions"]) == 4
+    assert len(data["difficulty_assessments"]) == 3
+    assert data["language"] == "bn"
+    assert data["difficulty_assessments"][0]["label"] == "unknown"
+    assert "Google" in data["disclaimer"]
+
+
+def test_reading_plan_accepts_one_item_not_fixed_ten() -> None:
+    response = client.post(
+        "/api/v1/reading/plan",
+        headers=HEADERS,
+        json={
+            "profile": {
+                "education_system": "self_learning",
+                "education_level": "general_reader",
+                "class_or_year": "",
+                "stream": "",
+                "board_or_curriculum": "",
+                "degree": "",
+                "major": "",
+                "semester": "",
+                "subjects": [],
+                "preferred_language": "en",
+            },
+            "items": [
+                {
+                    "id": "one-magazine",
+                    "type": "magazine",
+                    "title": "One Magazine",
+                    "author": "",
+                    "publisher": "",
+                    "published_date": "",
+                    "subject": "",
+                    "language": "en",
+                    "identifier": "",
+                    "source": "google_books",
+                    "source_url": "",
+                    "user_difficulty": "unknown",
+                    "priority": 3,
+                }
+            ],
+            "availability": {
+                "session_minutes": 20,
+                "sessions_per_week": 2,
+                "preferred_days": ["tue", "sat"],
+                "preferred_start_minutes": 1200,
+            },
+            "goal": "general_reading",
+            "target_date": None,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data["sessions"]) == 2
+    assert all(session["item_id"] == "one-magazine" for session in data["sessions"])

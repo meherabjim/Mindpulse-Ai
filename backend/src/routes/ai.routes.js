@@ -72,6 +72,13 @@ router.post(
 );
 
 
+router.post(
+    '/reading/plan',
+    authenticateUser,
+    aiController.generateReadingPlan
+);
+
+
 /*
 AI Coach conversation routes
 */

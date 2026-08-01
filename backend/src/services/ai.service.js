@@ -1,4 +1,4 @@
-﻿class AiServiceError extends Error {
+class AiServiceError extends Error {
     constructor(
         message,
         {
@@ -251,6 +251,19 @@ async function predictWellness(
 }
 
 
+async function generateReadingPlan(
+    payload
+) {
+    return request(
+        "/api/v1/reading/plan",
+        {
+            method: "POST",
+            body: payload,
+        }
+    );
+}
+
+
 module.exports = {
     AiServiceError,
     health,
@@ -258,4 +271,5 @@ module.exports = {
     checkSafety,
     getWellnessRecommendations,
     predictWellness,
+    generateReadingPlan,
 };

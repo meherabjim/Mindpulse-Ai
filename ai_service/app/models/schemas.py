@@ -1,4 +1,5 @@
-﻿from typing import Literal
+from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -247,3 +248,151 @@ class WellnessMLPredictionResponse(BaseModel):
         str,
         ModelPrediction,
     ]
+
+ReadingItemType = Literal[
+    "textbook",
+    "supplementary",
+    "book",
+    "novel",
+    "magazine",
+    "article",
+    "research_paper",
+    "own_material",
+]
+
+ReadingDifficulty = Literal[
+    "unknown",
+    "easy",
+    "medium",
+    "hard",
+]
+
+WeekdayCode = Literal[
+    "mon",
+    "tue",
+    "wed",
+    "thu",
+    "fri",
+    "sat",
+    "sun",
+]
+
+
+class ReadingEducationProfile(BaseModel):
+    education_system: str = Field(min_length=1, max_length=60)
+    education_level: str = Field(min_length=1, max_length=60)
+    class_or_year: str = Field(default="", max_length=80)
+    stream: str = Field(default="", max_length=80)
+    board_or_curriculum: str = Field(default="", max_length=120)
+    degree: str = Field(default="", max_length=120)
+    major: str = Field(default="", max_length=120)
+    semester: str = Field(default="", max_length=80)
+    subjects: list[str] = Field(default_factory=list, max_length=30)
+    preferred_language: Literal["bn", "en", "both"] = "bn"
+
+    @field_validator("subjects")
+    @classmethod
+    def validate_subjects(cls, value: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for raw in value:
+            subject = str(raw).strip()
+            if not subject:
+                continue
+            key = subject.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(subject[:100])
+        return cleaned
+
+
+class ReadingItemInput(BaseModel):
+    id: str = Field(min_length=1, max_length=160)
+    type: ReadingItemType
+    title: str = Field(min_length=1, max_length=300)
+    author: str = Field(default="", max_length=240)
+    publisher: str = Field(default="", max_length=240)
+    published_date: str = Field(default="", max_length=80)
+    subject: str = Field(default="", max_length=120)
+    language: str = Field(default="", max_length=40)
+    identifier: str = Field(default="", max_length=120)
+    source: Literal[
+        "google_books",
+        "crossref",
+        "open_library",
+        "nctb",
+        "manual",
+    ] = "manual"
+    source_url: str = Field(default="", max_length=1000)
+    user_difficulty: ReadingDifficulty = "unknown"
+    priority: int = Field(default=3, ge=1, le=5)
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Reading item title cannot be empty.")
+        return value
+
+
+class ReadingAvailability(BaseModel):
+    session_minutes: int = Field(default=30, ge=10, le=120)
+    sessions_per_week: int = Field(default=3, ge=1, le=14)
+    preferred_days: list[WeekdayCode] = Field(
+        default_factory=lambda: ["mon", "wed", "sat"],
+        min_length=1,
+        max_length=7,
+    )
+    preferred_start_minutes: int = Field(default=1140, ge=0, le=1439)
+
+
+class ReadingPlanRequest(BaseModel):
+    profile: ReadingEducationProfile
+    items: list[ReadingItemInput] = Field(min_length=1, max_length=30)
+    availability: ReadingAvailability
+    goal: str = Field(default="general_reading", min_length=1, max_length=100)
+    target_date: str | None = Field(default=None, max_length=40)
+
+
+class ReadingDifficultyAssessment(BaseModel):
+    item_id: str
+    label: ReadingDifficulty
+    confidence: float = Field(ge=0, le=1)
+    basis: list[str]
+    note: str
+
+
+class ReadingPlanSession(BaseModel):
+    session_id: str
+    day: WeekdayCode
+    day_label: str
+    start_minutes: int = Field(ge=0, le=1439)
+    duration_minutes: int = Field(ge=10, le=120)
+    item_id: str
+    title: str
+    subject: str
+    focus: str
+    reason: str
+    difficulty: ReadingDifficulty
+    confidence: float = Field(ge=0, le=1)
+
+
+class ReadingPlanSource(BaseModel):
+    name: str
+    usage: str
+
+
+class ReadingPlanResponse(BaseModel):
+    plan_id: str
+    engine: str
+    generated_at: datetime
+    language: Literal["bn", "en"]
+    summary: str
+    overall_confidence: float = Field(ge=0, le=1)
+    difficulty_assessments: list[ReadingDifficultyAssessment]
+    sessions: list[ReadingPlanSession]
+    assumptions: list[str]
+    sources: list[ReadingPlanSource]
+    disclaimer: str
