@@ -93,19 +93,6 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
 
-                "testAlarm" -> {
-                    val fajr =
-                        call.argument<Boolean>("fajr")
-                            ?: false
-
-                    PrayerAlarmScheduler.scheduleTest(
-                        this,
-                        fajr
-                    )
-
-                    result.success(null)
-                }
-
                 else -> result.notImplemented()
             }
         }

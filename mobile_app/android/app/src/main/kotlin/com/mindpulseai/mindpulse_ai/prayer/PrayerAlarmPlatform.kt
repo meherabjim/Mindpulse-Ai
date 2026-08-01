@@ -27,14 +27,13 @@ import androidx.core.content.ContextCompat
 import com.mindpulseai.mindpulse_ai.MainActivity
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 object PrayerAlarmScheduler {
     private const val preferencesName = "mindpulse_prayer_alarm"
     private const val scheduleKey = "scheduled_prayer_alarms"
+    private const val scheduleVersionKey = "scheduled_prayer_alarms_version"
+    private const val currentScheduleVersion = 2
     private const val actionAlarm = "com.mindpulseai.mindpulse_ai.PRAYER_ALARM"
 
     fun canScheduleExact(context: Context): Boolean {
@@ -48,72 +47,80 @@ object PrayerAlarmScheduler {
     fun scheduleAll(context: Context, scheduleJson: String): Int {
         cancelScheduledIntents(context, clearStoredSchedule = false)
         val array = JSONArray(scheduleJson)
+        val normalizedArray = JSONArray()
         var count = 0
 
         for (index in 0 until array.length()) {
             val item = array.getJSONObject(index)
-            if (item.getLong("triggerAtMillis") <= System.currentTimeMillis() + 20_000L) {
+            normalizePrayerReminder(item)
+            normalizedArray.put(item)
+
+            if (
+                item.getLong("triggerAtMillis") <=
+                System.currentTimeMillis() + 20_000L
+            ) {
                 continue
             }
+
             scheduleItem(context, item)
             count += 1
         }
 
         context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
             .edit()
-            .putString(scheduleKey, scheduleJson)
+            .putString(scheduleKey, normalizedArray.toString())
+            .putInt(scheduleVersionKey, currentScheduleVersion)
             .apply()
 
         return count
     }
 
     fun scheduleStored(context: Context): Int {
-        val json = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
-            .getString(scheduleKey, null)
+        val preferences = context.getSharedPreferences(
+            preferencesName,
+            Context.MODE_PRIVATE
+        )
+
+        if (
+            preferences.getInt(scheduleVersionKey, 0) !=
+            currentScheduleVersion
+        ) {
+            cancelScheduledIntents(
+                context,
+                clearStoredSchedule = true
+            )
+            return 0
+        }
+
+        val json = preferences.getString(scheduleKey, null)
             ?: return 0
+
         return scheduleAll(context, json)
+    }
+
+    private fun normalizePrayerReminder(item: JSONObject) {
+        if (item.optString("eventType") != "prayer_reminder") {
+            return
+        }
+
+        item.put(
+            "message",
+            "নামাজের সময় হয়ে যাচ্ছে। আপনারা নামাজের প্রস্তুতি নিন।"
+        )
+        item.put(
+            "voiceBn",
+            "নামাজের সময় হয়ে যাচ্ছে। আপনারা নামাজের প্রস্তুতি নিন।"
+        )
+        item.put(
+            "voiceEn",
+            "Prayer time is approaching. Please prepare for prayer."
+        )
+        item.put("durationSeconds", 15)
+        item.put("voiceRepeat", 1)
     }
 
     fun cancelAll(context: Context) {
         cancelScheduledIntents(context, clearStoredSchedule = true)
-    }
-
-    fun scheduleTest(context: Context, fajr: Boolean) {
-        val item = JSONObject().apply {
-            put("id", if (fajr) 999002 else 999001)
-            put("triggerAtMillis", System.currentTimeMillis() + 15_000L)
-            put("title", if (fajr) "Fajr prayer reminder" else "Dhuhr prayer reminder")
-            put(
-                "message",
-                if (fajr) {
-                    "30-second alarm, then the current-time voice twice."
-                } else {
-                    "15-second alarm, then the current-time Dhuhr voice."
-                }
-            )
-            put(
-                "voiceBn",
-                if (fajr) {
-                    "ফজরের নামাজের জন্য প্রস্তুতি নিন।"
-                } else {
-                    "যোহরের নামাজের জন্য প্রস্তুতি নিন।"
-                }
-            )
-            put(
-                "voiceEn",
-                if (fajr) {
-                    "Please prepare for Fajr prayer."
-                } else {
-                    "Please prepare for Dhuhr prayer."
-                }
-            )
-            put("prayerBn", if (fajr) "ফজরের" else "যোহরের")
-            put("prayerEn", if (fajr) "Fajr" else "Dhuhr")
-            put("durationSeconds", if (fajr) 30 else 15)
-            put("voiceRepeat", if (fajr) 2 else 1)
-        }
-
-        scheduleItem(context, item)
     }
 
     private fun scheduleItem(context: Context, item: JSONObject) {
@@ -157,7 +164,10 @@ object PrayerAlarmScheduler {
         cancelItem(context, 999002)
 
         if (clearStoredSchedule) {
-            preferences.edit().remove(scheduleKey).apply()
+            preferences.edit()
+                .remove(scheduleKey)
+                .remove(scheduleVersionKey)
+                .apply()
         }
     }
 
@@ -377,45 +387,6 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
         speakWhenReady()
     }
 
-    private fun toBanglaDigits(value: Int): String {
-        val digits = charArrayOf(
-            '০', '১', '২', '৩', '৪',
-            '৫', '৬', '৭', '৮', '৯'
-        )
-
-        return value.toString().map { digit ->
-            if (digit.isDigit()) {
-                digits[digit.digitToInt()]
-            } else {
-                digit
-            }
-        }.joinToString("")
-    }
-
-    private fun currentBanglaTimeText(): String {
-        val calendar = Calendar.getInstance()
-        val hour24 = calendar.get(Calendar.HOUR_OF_DAY)
-        val hour12 = when (val value = hour24 % 12) {
-            0 -> 12
-            else -> value
-        }
-        val minute = calendar.get(Calendar.MINUTE)
-
-        return if (minute == 0) {
-            "${toBanglaDigits(hour12)}টা"
-        } else {
-            "${toBanglaDigits(hour12)}টা " +
-                "${toBanglaDigits(minute)} মিনিট"
-        }
-    }
-
-    private fun currentEnglishTimeText(): String {
-        return SimpleDateFormat(
-            "h:mm a",
-            Locale.ENGLISH
-        ).format(Date())
-    }
-
     private fun isManualReminder(): Boolean {
         return currentEventType.startsWith("manual_")
     }
@@ -423,41 +394,25 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
     private fun buildBanglaVoice(): String {
         if (isManualReminder()) {
             return voiceBn.ifBlank {
-                "এখন ${currentBanglaTimeText()} বাজে। " +
-                    "আপনার রিমাইন্ডারের সময় হয়েছে।"
+                "আপনার রিমাইন্ডারের সময় হয়েছে।"
             }
         }
 
-        if (prayerBn.isBlank()) {
-            return voiceBn.ifBlank {
-                voiceEn.ifBlank {
-                    "নামাজের জন্য প্রস্তুতি নিন।"
-                }
-            }
+        return voiceBn.ifBlank {
+            "নামাজের সময় হয়ে যাচ্ছে। আপনারা নামাজের প্রস্তুতি নিন।"
         }
-
-        return "এখন ${currentBanglaTimeText()} বাজে। " +
-            "আপনি $prayerBn নামাজের জন্য প্রস্তুতি নিন। " +
-            "তারপর নামাজ পড়তে যান। নামাজেই আসল সুখ।"
     }
 
     private fun buildEnglishVoice(): String {
         if (isManualReminder()) {
             return voiceEn.ifBlank {
-                "It is now ${currentEnglishTimeText()}. " +
-                    "Your reminder is due."
+                "Your reminder is due."
             }
         }
 
-        if (prayerEn.isBlank()) {
-            return voiceEn.ifBlank {
-                "Please prepare for prayer."
-            }
+        return voiceEn.ifBlank {
+            "Prayer time is approaching. Please prepare for prayer."
         }
-
-        return "It is now ${currentEnglishTimeText()}. " +
-            "Please prepare for $prayerEn prayer, " +
-            "then go and pray."
     }
 
     private fun speakWhenReady() {
@@ -601,7 +556,11 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
         )
 
         val completedMessage =
-            "$message Reminder was triggered."
+            if (currentEventType == "prayer_reminder") {
+                message
+            } else {
+                "$message Reminder was triggered."
+            }
 
         return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -629,10 +588,10 @@ class PrayerAlarmService : Service(), TextToSpeech.OnInitListener {
 
         val channel = NotificationChannel(
             channelId,
-            "Reminders and alarms",
+            "Prayer and personal reminders",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "MindPulse reminder alarm sound and voice"
+            description = "MindPulse prayer and personal reminder sound and voice"
             setSound(null, null)
             enableVibration(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC

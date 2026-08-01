@@ -54,10 +54,4 @@ class PrayerAlarmBridge {
   Future<void> cancelAll() async {
     await _channel.invokeMethod<void>('cancelAll');
   }
-
-  Future<void> testAlarm({required bool fajr}) async {
-    await _channel.invokeMethod<void>('testAlarm', <String, Object?>{
-      'fajr': fajr,
-    });
-  }
 }

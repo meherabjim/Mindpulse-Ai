@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/my_day_task.dart';
 import '../models/reading_plan_models.dart';
+import 'my_day_repository.dart';
 
 class ReadingPlanSavedState {
   const ReadingPlanSavedState({
@@ -28,7 +30,6 @@ class ReadingPlanRepository {
   static const itemsKey = 'mindpulse_ai_guide_items_v2';
   static const settingsKey = 'mindpulse_ai_guide_settings_v3';
   static const planKey = 'mindpulse_ai_guide_plan_v3';
-  static const myDayKey = 'mindpulse_my_day_schedule_v1';
 
   Future<ReadingPlanSavedState> load() async {
     final preferences = await SharedPreferences.getInstance();
@@ -188,37 +189,74 @@ class ReadingPlanRepository {
   }
 
   Future<void> addSessionToMyDay(ReadingPlanSessionModel session) async {
-    final preferences = await SharedPreferences.getInstance();
-    final raw = preferences.getString(myDayKey);
-    final tasks = <Map<String, dynamic>>[];
+    const repository = MyDayRepository();
+    final tasks = await repository.loadTasks();
+    final taskId = 'reading_plan_${session.sessionId}';
 
-    if (raw != null && raw.trim().isNotEmpty) {
-      final decoded = jsonDecode(raw);
-      if (decoded is List) {
-        tasks.addAll(
-          decoded.whereType<Map>().map(
-            (item) => Map<String, dynamic>.from(item),
-          ),
-        );
-      }
+    if (tasks.any((task) => task.id == taskId)) {
+      return;
     }
 
-    final taskId = 'reading_plan_${session.sessionId}';
-    final alreadyExists = tasks.any((task) => task['id']?.toString() == taskId);
-    if (alreadyExists) return;
+    final now = DateTime.now();
+    final scheduledDate = _nextDateForDay(
+      session.day,
+      now,
+      session.startMinutes,
+    );
 
-    tasks.add(<String, dynamic>{
-      'id': taskId,
-      'title': session.subject.trim().isEmpty
-          ? session.title
-          : '${session.subject}: ${session.title}',
-      'minutes_of_day': session.startMinutes,
-      'duration_minutes': session.durationMinutes,
-      'category': 'পড়াশোনা',
-      'alarm_enabled': false,
-      'completed': false,
-    });
+    await repository.upsert(
+      tasks,
+      MyDayTask(
+        id: taskId,
+        title: session.subject.trim().isEmpty
+            ? session.title
+            : '${session.subject}: ${session.title}',
+        date: scheduledDate,
+        minutesOfDay: session.startMinutes,
+        durationMinutes: session.durationMinutes,
+        category: 'পড়াশোনা',
+        source: 'ai_guide',
+        status: MyDayTaskStatus.pending,
+        alarmEnabled: false,
+        notes: <String>[
+          if (session.focus.trim().isNotEmpty) session.focus.trim(),
+          if (session.reason.trim().isNotEmpty) session.reason.trim(),
+        ].join(' • '),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
 
-    await preferences.setString(myDayKey, jsonEncode(tasks));
+  DateTime _nextDateForDay(
+    String rawDay,
+    DateTime from,
+    int sessionStartMinutes,
+  ) {
+    const weekdays = <String, int>{
+      'mon': DateTime.monday,
+      'tue': DateTime.tuesday,
+      'wed': DateTime.wednesday,
+      'thu': DateTime.thursday,
+      'fri': DateTime.friday,
+      'sat': DateTime.saturday,
+      'sun': DateTime.sunday,
+    };
+
+    final targetWeekday = weekdays[rawDay.trim().toLowerCase()];
+    final start = MyDayTask.dateOnly(from);
+
+    if (targetWeekday == null) {
+      return start;
+    }
+
+    var delta = (targetWeekday - start.weekday + 7) % 7;
+    final currentMinutes = (from.hour * 60) + from.minute;
+
+    if (delta == 0 && sessionStartMinutes <= currentMinutes + 10) {
+      delta = 7;
+    }
+
+    return start.add(Duration(days: delta));
   }
 }

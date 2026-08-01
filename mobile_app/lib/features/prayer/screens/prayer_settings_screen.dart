@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/settings/app_preferences_controller.dart';
 import '../services/prayer_alarm_bridge.dart';
 import '../services/prayer_service.dart';
 
@@ -15,17 +16,27 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
   late final PrayerService _service = PrayerService(bridge: _bridge);
 
   bool _loading = true;
+  bool _syncing = false;
   bool _enabled = false;
-  Map<String, String> _jamaatTimes = <String, String>{};
+  Map<String, String> _reminderTimes = <String, String>{};
   String? _savingPrayerKey;
 
   PrayerAlarmStatus _status = const PrayerAlarmStatus(
     notificationPermission: false,
     exactAlarmPermission: false,
   );
+
   PrayerSyncResult? _lastResult;
   DateTime? _lastSync;
   String? _error;
+
+  String _t(String english, String bangla) {
+    return AppPreferencesController.instance.text(english, bangla);
+  }
+
+  bool get _permissionsReady {
+    return _status.notificationPermission && _status.exactAlarmPermission;
+  }
 
   @override
   void initState() {
@@ -41,56 +52,150 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
 
   Future<void> _load() async {
     try {
-      final enabled = await _service.isEnabled();
-      final status = await _bridge.getStatus();
-      final lastSync = await _service.lastSync();
-      final jamaatTimes = await _service.loadJamaatTimes();
+      final values = await Future.wait<Object?>(<Future<Object?>>[
+        _service.isEnabled(),
+        _bridge.getStatus(),
+        _service.lastSync(),
+        _service.loadReminderTimes(),
+      ]);
 
       if (!mounted) {
         return;
       }
+
       setState(() {
-        _enabled = enabled;
-        _status = status;
-        _lastSync = lastSync;
-        _jamaatTimes = jamaatTimes;
+        _enabled = values[0] as bool;
+        _status = values[1] as PrayerAlarmStatus;
+        _lastSync = values[2] as DateTime?;
+        _reminderTimes = values[3] as Map<String, String>;
         _loading = false;
+        _error = null;
       });
+
+      if (_enabled) {
+        await _sync(silent: true);
+      }
     } catch (error) {
       if (!mounted) {
         return;
       }
+
       setState(() {
-        _error = error.toString();
         _loading = false;
+        _error = error.toString();
       });
     }
   }
 
-  TimeOfDay _initialTimeFor(String prayerKey) {
-    final storedValue = _jamaatTimes[prayerKey];
+  Future<void> _refreshPermissionStatus() async {
+    final status = await _bridge.getStatus();
 
-    if (storedValue == null || storedValue.trim().isEmpty) {
-      return TimeOfDay.now();
+    if (!mounted) {
+      return;
     }
 
-    final parts = storedValue.split(':');
-
-    if (parts.length != 2) {
-      return TimeOfDay.now();
-    }
-
-    return TimeOfDay(
-      hour: int.tryParse(parts[0]) ?? 0,
-      minute: int.tryParse(parts[1]) ?? 0,
-    );
+    setState(() {
+      _status = status;
+    });
   }
 
-  Future<void> _editJamaatTime(String prayerKey, String prayerLabel) async {
+  Future<void> _requestMissingPermissions() async {
+    try {
+      if (!_status.notificationPermission) {
+        await _bridge.requestNotificationPermission();
+      }
+
+      if (!_status.exactAlarmPermission) {
+        await _bridge.requestExactAlarmPermission();
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await _refreshPermissionStatus();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (!_permissionsReady) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _t(
+                'Allow notifications and Alarms & reminders, then return to MindPulse.',
+                'নোটিফিকেশন এবং অ্যালার্মের অনুমতি দিয়ে MindPulse-এ ফিরে আসুন।',
+              ),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _toggleEnabled(bool value) async {
+    if (!value) {
+      setState(() {
+        _syncing = true;
+        _error = null;
+      });
+
+      try {
+        await _service.setEnabled(false);
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _enabled = false;
+          _syncing = false;
+          _lastResult = null;
+        });
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _syncing = false;
+        });
+        _showError(error);
+      }
+
+      return;
+    }
+
+    await _requestMissingPermissions();
+
+    if (!mounted || !_permissionsReady) {
+      return;
+    }
+
+    await _sync();
+  }
+
+  TimeOfDay _initialTimeFor(String prayerKey) {
+    final storedValue = _reminderTimes[prayerKey];
+
+    if (storedValue == null || storedValue.trim().isEmpty) {
+      final now = TimeOfDay.now();
+      return TimeOfDay(hour: now.hour, minute: now.minute);
+    }
+
+    final parsed = PrayerTimeParser.parse(storedValue);
+    return TimeOfDay(hour: parsed.hour, minute: parsed.minute);
+  }
+
+  Future<void> _editReminderTime(String prayerKey, String prayerLabel) async {
     final selectedTime = await showTimePicker(
       context: context,
       initialTime: _initialTimeFor(prayerKey),
-      helpText: 'Select $prayerLabel jamaat time',
+      helpText: _t(
+        'Select $prayerLabel reminder time',
+        '$prayerLabel নামাজের মনে করানোর সময়',
+      ),
     );
 
     if (selectedTime == null || !mounted) {
@@ -106,134 +211,104 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     });
 
     try {
-      await _service.saveJamaatTimes(<String, String?>{prayerKey: storedValue});
+      await _service.saveReminderTimes(<String, String?>{
+        prayerKey: storedValue,
+      });
 
-      PrayerSyncResult? updatedResult;
-      DateTime? updatedLastSync;
-
-      if (_enabled) {
-        updatedResult = await _service.syncOnlineSchedule();
-        updatedLastSync = await _service.lastSync();
-      }
-
-      final updatedTimes = await _service.loadJamaatTimes();
+      final updatedTimes = await _service.loadReminderTimes();
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _jamaatTimes = updatedTimes;
-        _lastResult = updatedResult ?? _lastResult;
-
-        if (updatedLastSync != null) {
-          _lastSync = updatedLastSync;
-        }
-
+        _reminderTimes = updatedTimes;
         _savingPrayerKey = null;
       });
 
+      if (_enabled) {
+        await _sync(silent: true);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$prayerLabel jamaat time saved.'),
+          content: Text(
+            _t(
+              '$prayerLabel reminder time saved.',
+              '$prayerLabel নামাজের মনে করানোর সময় সংরক্ষণ হয়েছে।',
+            ),
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (error) {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _savingPrayerKey = null;
+        });
       }
-
-      setState(() {
-        _savingPrayerKey = null;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString()),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showError(error);
     }
   }
 
-  Future<void> _resetJamaatTime(String prayerKey, String prayerLabel) async {
+  Future<void> _resetReminderTime(String prayerKey, String prayerLabel) async {
     setState(() {
       _savingPrayerKey = prayerKey;
     });
 
     try {
-      await _service.saveJamaatTimes(<String, String?>{prayerKey: null});
-
-      PrayerSyncResult? updatedResult;
-      DateTime? updatedLastSync;
-
-      if (_enabled) {
-        updatedResult = await _service.syncOnlineSchedule();
-        updatedLastSync = await _service.lastSync();
-      }
-
-      final updatedTimes = await _service.loadJamaatTimes();
+      await _service.saveReminderTimes(<String, String?>{prayerKey: null});
+      final updatedTimes = await _service.loadReminderTimes();
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _jamaatTimes = updatedTimes;
-        _lastResult = updatedResult ?? _lastResult;
-
-        if (updatedLastSync != null) {
-          _lastSync = updatedLastSync;
-        }
-
+        _reminderTimes = updatedTimes;
         _savingPrayerKey = null;
       });
 
+      if (_enabled) {
+        await _sync(silent: true);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$prayerLabel time reset.'),
+          content: Text(
+            _t(
+              '$prayerLabel reminder returned to its default rule.',
+              '$prayerLabel নামাজের মনে করানোর সময় আগের নিয়মে ফিরে গেছে।',
+            ),
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (error) {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _savingPrayerKey = null;
+        });
       }
-
-      setState(() {
-        _savingPrayerKey = null;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString()),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showError(error);
     }
   }
 
-  Future<void> _requestPermissions() async {
-    await _bridge.requestNotificationPermission();
-    await _bridge.requestExactAlarmPermission();
-    if (!mounted) {
+  Future<void> _sync({bool silent = false}) async {
+    if (_syncing) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Grant notification and Alarms & reminders permissions, '
-          'then return and tap Refresh status.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 
-  Future<void> _sync() async {
     setState(() {
-      _loading = true;
+      _syncing = true;
       _error = null;
     });
 
@@ -241,363 +316,527 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
       final result = await _service.syncOnlineSchedule();
       final status = await _bridge.getStatus();
       final lastSync = await _service.lastSync();
+
       if (!mounted) {
         return;
       }
+
       setState(() {
         _enabled = true;
         _status = status;
         _lastResult = result;
         _lastSync = lastSync;
-        _loading = false;
+        _syncing = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${result.scheduledCount} prayer alarms scheduled.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _error = error.toString();
-        _loading = false;
-      });
-    }
-  }
 
-  Future<void> _disable() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      await _service.setEnabled(false);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _enabled = false;
-        _lastResult = null;
-        _loading = false;
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _error = error.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _test({required bool fajr}) async {
-    try {
-      await _bridge.testAlarm(fajr: fajr);
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            fajr
-                ? 'Fajr test starts in 15 seconds.'
-                : 'Normal test starts in 15 seconds.',
+      if (!silent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _t(
+                '${result.scheduledCount} prayer reminders are ready.',
+                '${result.scheduledCount}টি নামাজের স্মরণ প্রস্তুত হয়েছে।',
+              ),
+            ),
+            behavior: SnackBarBehavior.floating,
           ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        );
+      }
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString()),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+
+      setState(() {
+        _syncing = false;
+        _error = error.toString();
+      });
     }
+  }
+
+  void _showError(Object error) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error.toString()),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  String _formatLastSync(BuildContext context) {
+    final value = _lastSync;
+
+    if (value == null) {
+      return _t('Not updated yet', 'এখনো আপডেট হয়নি');
+    }
+
+    final local = value.toLocal();
+    final date = MaterialLocalizations.of(context).formatShortDate(local);
+    final time = MaterialLocalizations.of(
+      context,
+    ).formatTimeOfDay(TimeOfDay.fromDateTime(local));
+
+    return '$date • $time';
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FC),
-      appBar: AppBar(
-        title: const Text('Smart prayer alarms'),
-        backgroundColor: const Color(0xFFF7F7FC),
-        surfaceTintColor: Colors.transparent,
-        actions: [
-          IconButton(
-            tooltip: 'Refresh status',
-            onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(_t('Prayer reminders', 'নামাজের স্মরণ'))),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: <Color>[Color(0xFF6059E8), Color(0xFF8257F5)],
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 120),
+                  children: [
+                    _PrayerHero(
+                      enabled: _enabled,
+                      syncing: _syncing,
+                      onChanged: _toggleEnabled,
+                      translate: _t,
+                    ),
+                    const SizedBox(height: 14),
+                    _MessageCard(translate: _t),
+                    if (!_permissionsReady) ...[
+                      const SizedBox(height: 14),
+                      _PermissionCard(
+                        status: _status,
+                        onRequest: _requestMissingPermissions,
+                        translate: _t,
                       ),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.mosque_rounded,
-                          color: Colors.white,
-                          size: 38,
-                        ),
-                        SizedBox(height: 14),
-                        Text(
-                          'Hybrid daily prayer schedule',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Dhuhr and Friday Jummah are 1:30 PM by default. '
-                          'Jamaat times can be edited, and saved-time alarms '
-                          'will be scheduled automatically.',
-                          style: TextStyle(
-                            color: Color(0xFFEAE9FF),
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  _StatusCard(
-                    enabled: _enabled,
-                    status: _status,
-                    lastSync: _lastSync,
-                  ),
-                  const SizedBox(height: 14),
-                  _JamaatTimesCard(
-                    times: _jamaatTimes,
-                    savingPrayerKey: _savingPrayerKey,
-                    onEdit: _editJamaatTime,
-                    onReset: _resetJamaatTime,
-                  ),
-                  const SizedBox(height: 14),
-                  const _BehaviourCard(),
-                  if (_lastResult != null) ...[
+                    ],
                     const SizedBox(height: 14),
-                    _TodayCard(result: _lastResult!),
-                  ],
-                  if (_error != null) ...[
-                    const SizedBox(height: 14),
-                    Card(
-                      color: const Color(0xFFFFEDED),
-                      child: Padding(
+                    _ReminderTimesCard(
+                      times: _reminderTimes,
+                      savingPrayerKey: _savingPrayerKey,
+                      onEdit: _editReminderTime,
+                      onReset: _resetReminderTime,
+                      translate: _t,
+                    ),
+                    if (_lastResult != null) ...[
+                      const SizedBox(height: 14),
+                      _TodayPrayerCard(result: _lastResult!, translate: _t),
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      Container(
                         padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colors.errorContainer,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                         child: Text(
                           _error!,
-                          style: const TextStyle(
-                            color: Color(0xFF9C2525),
-                            fontWeight: FontWeight.w700,
+                          style: TextStyle(
+                            color: colors.onErrorContainer,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
+                    ],
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: _syncing || !_enabled ? null : () => _sync(),
+                      icon: _syncing
+                          ? const SizedBox(
+                              width: 19,
+                              height: 19,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.sync_rounded),
+                      label: Text(
+                        _t('Update prayer times', 'নামাজের সময় আপডেট করুন'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${_t('Last update', 'সর্বশেষ আপডেট')}: '
+                      '${_formatLastSync(context)}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 18),
-                  FilledButton.icon(
-                    onPressed: _loading ? null : _requestPermissions,
-                    icon: const Icon(Icons.admin_panel_settings_outlined),
-                    label: const Text('Grant alarm permissions'),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
-                    onPressed: _loading ? null : _sync,
-                    icon: const Icon(Icons.cloud_sync_rounded),
-                    label: Text(
-                      _enabled
-                          ? 'Refresh prayer schedule'
-                          : 'Enable prayer schedule',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _loading ? null : () => _test(fajr: false),
-                    icon: const Icon(Icons.notifications_active_outlined),
-                    label: const Text('Demo Dhuhr alarm in 15 seconds'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _loading ? null : () => _test(fajr: true),
-                    icon: const Icon(Icons.bedtime_outlined),
-                    label: const Text('Test Fajr alarm in 15 seconds'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton.icon(
-                    onPressed: _loading || !_enabled ? null : _disable,
-                    icon: const Icon(Icons.notifications_off_outlined),
-                    label: const Text('Disable all prayer alarms'),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Bengali speech uses the Android speech engine. '
-                    'When Bengali speech is unavailable, the message '
-                    'falls back to English.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF777786),
-                      fontSize: 12,
-                      height: 1.45,
-                    ),
-                  ),
-                ],
+                ),
               ),
       ),
     );
   }
 }
 
-class _JamaatTimesCard extends StatelessWidget {
-  const _JamaatTimesCard({
+typedef _Translate = String Function(String english, String bangla);
+
+class _PrayerHero extends StatelessWidget {
+  const _PrayerHero({
+    required this.enabled,
+    required this.syncing,
+    required this.onChanged,
+    required this.translate,
+  });
+
+  final bool enabled;
+  final bool syncing;
+  final ValueChanged<bool> onChanged;
+  final _Translate translate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[Color(0xFF4F46D8), Color(0xFF7B58E8)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x334F46D8),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.notifications_active_rounded,
+            color: Colors.white,
+            size: 34,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            translate('Prayer reminder', 'নামাজের স্মরণ'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 25,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            translate(
+              'Online prayer times are used for your location. You control the reminder time.',
+              'আপনার অবস্থান অনুযায়ী অনলাইন নামাজের সময় নেওয়া হবে। কখন মনে করাবে, সেটি আপনি ঠিক করবেন।',
+            ),
+            style: const TextStyle(color: Color(0xFFF0EEFF), height: 1.45),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                enabled
+                    ? translate('Reminders are on', 'নামাজের স্মরণ চালু আছে')
+                    : translate('Reminders are off', 'নামাজের স্মরণ বন্ধ আছে'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              subtitle: Text(
+                enabled
+                    ? translate(
+                        'The saved schedule will also return after a device restart.',
+                        'ফোন বন্ধ করে চালু করলেও সংরক্ষিত সময়গুলো আবার সক্রিয় হবে।',
+                      )
+                    : translate(
+                        'Turn on to prepare the next 30 days.',
+                        'পরবর্তী ৩০ দিনের স্মরণ তৈরি করতে চালু করুন।',
+                      ),
+                style: const TextStyle(color: Color(0xFFE8E5FF), fontSize: 12),
+              ),
+              value: enabled,
+              onChanged: syncing ? null : onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageCard extends StatelessWidget {
+  const _MessageCard({required this.translate});
+
+  final _Translate translate;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.record_voice_over_rounded, color: colors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  translate('Voice message', 'যে কথাটি শোনা যাবে'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  PrayerService.banglaReminderMessage,
+                  style: TextStyle(
+                    color: colors.onPrimaryContainer,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PermissionCard extends StatelessWidget {
+  const _PermissionCard({
+    required this.status,
+    required this.onRequest,
+    required this.translate,
+  });
+
+  final PrayerAlarmStatus status;
+  final VoidCallback onRequest;
+  final _Translate translate;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final missing = <String>[];
+
+    if (!status.notificationPermission) {
+      missing.add(translate('Notifications', 'নোটিফিকেশন'));
+    }
+
+    if (!status.exactAlarmPermission) {
+      missing.add(translate('Alarms & reminders', 'অ্যালার্ম ও স্মরণ'));
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colors.tertiaryContainer.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            translate('Permission needed', 'একবার অনুমতি প্রয়োজন'),
+            style: TextStyle(
+              color: colors.onTertiaryContainer,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            missing.join(' • '),
+            style: TextStyle(color: colors.onTertiaryContainer),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onRequest,
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            label: Text(translate('Allow permissions', 'অনুমতি দিন')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderTimesCard extends StatelessWidget {
+  const _ReminderTimesCard({
     required this.times,
     required this.savingPrayerKey,
     required this.onEdit,
     required this.onReset,
+    required this.translate,
   });
 
   final Map<String, String> times;
   final String? savingPrayerKey;
-
   final Future<void> Function(String prayerKey, String prayerLabel) onEdit;
-
   final Future<void> Function(String prayerKey, String prayerLabel) onReset;
+  final _Translate translate;
 
-  static const List<_EditablePrayer> _prayers = <_EditablePrayer>[
-    _EditablePrayer(
-      keyName: 'fajr',
-      label: 'Fajr',
-      automaticRule: 'Automatic: online waqt + 10 minutes',
-    ),
-    _EditablePrayer(
-      keyName: 'dhuhr',
-      label: 'Dhuhr',
-      automaticRule: 'Default jamaat: 1:30 PM',
-    ),
-    _EditablePrayer(
-      keyName: 'jummah',
-      label: 'Jummah',
-      automaticRule: 'Friday default jamaat: 1:30 PM',
-    ),
-    _EditablePrayer(
-      keyName: 'asr',
-      label: 'Asr',
-      automaticRule: 'Set your mosque jamaat time',
-    ),
-    _EditablePrayer(
-      keyName: 'maghrib',
-      label: 'Maghrib',
-      automaticRule: 'Automatic: online waqt - 15 minutes',
-    ),
-    _EditablePrayer(
-      keyName: 'isha',
-      label: 'Isha',
-      automaticRule: 'Set your mosque jamaat time',
-    ),
-  ];
+  static const List<_PrayerReminderDefinition> _prayers =
+      <_PrayerReminderDefinition>[
+        _PrayerReminderDefinition(
+          keyName: 'fajr',
+          english: 'Fajr',
+          bangla: 'ফজর',
+          automaticBangla: 'অনলাইন সময়ের ১০ মিনিট আগে',
+          automaticEnglish: '10 minutes before online time',
+        ),
+        _PrayerReminderDefinition(
+          keyName: 'dhuhr',
+          english: 'Dhuhr',
+          bangla: 'যোহর',
+          automaticBangla: 'প্রাথমিক সময়: ১:০৫ PM',
+          automaticEnglish: 'Default reminder: 1:05 PM',
+        ),
+        _PrayerReminderDefinition(
+          keyName: 'jummah',
+          english: 'Jummah',
+          bangla: 'জুমা',
+          automaticBangla: 'শুক্রবারের সময়: ১২:৩৫ PM',
+          automaticEnglish: 'Friday reminder: 12:35 PM',
+        ),
+        _PrayerReminderDefinition(
+          keyName: 'asr',
+          english: 'Asr',
+          bangla: 'আসর',
+          automaticBangla: 'অনলাইন সময়ের ১০ মিনিট আগে',
+          automaticEnglish: '10 minutes before online time',
+        ),
+        _PrayerReminderDefinition(
+          keyName: 'maghrib',
+          english: 'Maghrib',
+          bangla: 'মাগরিব',
+          automaticBangla: 'অনলাইন সময়ের ১০ মিনিট আগে',
+          automaticEnglish: '10 minutes before online time',
+        ),
+        _PrayerReminderDefinition(
+          keyName: 'isha',
+          english: 'Isha',
+          bangla: 'এশা',
+          automaticBangla: 'অনলাইন সময়ের ১০ মিনিট আগে',
+          automaticEnglish: '10 minutes before online time',
+        ),
+      ];
 
-  String _displayTime(BuildContext context, String? storedValue) {
-    if (storedValue == null || storedValue.trim().isEmpty) {
-      return 'Automatic';
+  String _displayTime(BuildContext context, String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return translate('Automatic', 'Automatic');
     }
 
-    final parts = storedValue.split(':');
-
-    if (parts.length != 2) {
-      return storedValue;
-    }
-
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1]);
-
-    if (hour == null || minute == null) {
-      return storedValue;
-    }
-
-    return TimeOfDay(hour: hour, minute: minute).format(context);
+    final parsed = PrayerTimeParser.parse(value);
+    return TimeOfDay(hour: parsed.hour, minute: parsed.minute).format(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Mosque jamaat times',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            translate('Reminder times', 'মনে করানোর সময়'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            translate(
+              'These are reminder times. Edit any row when your routine is different.',
+              'এগুলো মনে করানোর সময়। আপনার রুটিন আলাদা হলে যেকোনো সময় পরিবর্তন করুন।',
             ),
-            const SizedBox(height: 6),
-            const Text(
-              'Edit the jamaat time beside each prayer. '
-              'Saved jamaat alarms will ring 20 minutes earlier.',
-              style: TextStyle(color: Color(0xFF686878), height: 1.4),
-            ),
-            const SizedBox(height: 14),
-            for (var index = 0; index < _prayers.length; index++) ...[
-              _JamaatTimeRow(
-                prayer: _prayers[index],
-                displayedTime: _displayTime(
-                  context,
-                  times[_prayers[index].keyName],
-                ),
-                saving: savingPrayerKey == _prayers[index].keyName,
-                onEdit: () =>
-                    onEdit(_prayers[index].keyName, _prayers[index].label),
-                onReset: () =>
-                    onReset(_prayers[index].keyName, _prayers[index].label),
+            style: TextStyle(color: colors.onSurfaceVariant, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          for (var index = 0; index < _prayers.length; index++) ...[
+            _ReminderTimeRow(
+              definition: _prayers[index],
+              displayedTime: _displayTime(
+                context,
+                times[_prayers[index].keyName],
               ),
-              if (index != _prayers.length - 1) const Divider(height: 22),
-            ],
+              saving: savingPrayerKey == _prayers[index].keyName,
+              onEdit: () => onEdit(
+                _prayers[index].keyName,
+                translate(_prayers[index].english, _prayers[index].bangla),
+              ),
+              onReset: () => onReset(
+                _prayers[index].keyName,
+                translate(_prayers[index].english, _prayers[index].bangla),
+              ),
+              translate: translate,
+            ),
+            if (index != _prayers.length - 1) const Divider(height: 22),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
-class _JamaatTimeRow extends StatelessWidget {
-  const _JamaatTimeRow({
-    required this.prayer,
+class _PrayerReminderDefinition {
+  const _PrayerReminderDefinition({
+    required this.keyName,
+    required this.english,
+    required this.bangla,
+    required this.automaticBangla,
+    required this.automaticEnglish,
+  });
+
+  final String keyName;
+  final String english;
+  final String bangla;
+  final String automaticBangla;
+  final String automaticEnglish;
+}
+
+class _ReminderTimeRow extends StatelessWidget {
+  const _ReminderTimeRow({
+    required this.definition,
     required this.displayedTime,
     required this.saving,
     required this.onEdit,
     required this.onReset,
+    required this.translate,
   });
 
-  final _EditablePrayer prayer;
+  final _PrayerReminderDefinition definition;
   final String displayedTime;
   final bool saving;
   final VoidCallback onEdit;
   final VoidCallback onReset;
+  final _Translate translate;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Row(
       children: [
         Expanded(
@@ -605,16 +844,19 @@ class _JamaatTimeRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                prayer.label,
+                translate(definition.english, definition.bangla),
                 style: const TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
-                prayer.automaticRule,
-                style: const TextStyle(color: Color(0xFF777786), fontSize: 12),
+                translate(
+                  definition.automaticEnglish,
+                  definition.automaticBangla,
+                ),
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
               ),
             ],
           ),
@@ -635,25 +877,25 @@ class _JamaatTimeRow extends StatelessWidget {
             children: [
               Text(
                 displayedTime,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF5149D8),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: colors.primary,
                 ),
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: 'Edit jamaat time',
+                    tooltip: translate('Edit time', 'সময় পরিবর্তন'),
                     visualDensity: VisualDensity.compact,
                     onPressed: onEdit,
-                    icon: const Icon(Icons.access_time_rounded, size: 21),
+                    icon: const Icon(Icons.edit_calendar_rounded, size: 20),
                   ),
                   IconButton(
-                    tooltip: 'Reset time',
+                    tooltip: translate('Use default', 'আগের নিয়ম ব্যবহার'),
                     visualDensity: VisualDensity.compact,
                     onPressed: onReset,
-                    icon: const Icon(Icons.restart_alt_rounded, size: 21),
+                    icon: const Icon(Icons.restart_alt_rounded, size: 20),
                   ),
                 ],
               ),
@@ -664,213 +906,105 @@ class _JamaatTimeRow extends StatelessWidget {
   }
 }
 
-class _EditablePrayer {
-  const _EditablePrayer({
-    required this.keyName,
-    required this.label,
-    required this.automaticRule,
-  });
-
-  final String keyName;
-  final String label;
-  final String automaticRule;
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.enabled,
-    required this.status,
-    required this.lastSync,
-  });
-
-  final bool enabled;
-  final PrayerAlarmStatus status;
-  final DateTime? lastSync;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          children: [
-            _StatusRow(
-              label: 'Prayer alarms',
-              passed: enabled,
-              value: enabled ? 'Enabled' : 'Disabled',
-            ),
-            const Divider(height: 24),
-            _StatusRow(
-              label: 'Notifications',
-              passed: status.notificationPermission,
-              value: status.notificationPermission
-                  ? 'Allowed'
-                  : 'Permission required',
-            ),
-            const Divider(height: 24),
-            _StatusRow(
-              label: 'Exact alarms',
-              passed: status.exactAlarmPermission,
-              value: status.exactAlarmPermission
-                  ? 'Allowed'
-                  : 'Permission required',
-            ),
-            const Divider(height: 24),
-            _StatusRow(
-              label: 'Last schedule sync',
-              passed: lastSync != null,
-              value: lastSync == null
-                  ? 'Not synced'
-                  : lastSync!.toLocal().toString().split('.').first,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusRow extends StatelessWidget {
-  const _StatusRow({
-    required this.label,
-    required this.passed,
-    required this.value,
-  });
-
-  final String label;
-  final bool passed;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          passed ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-          color: passed ? const Color(0xFF18864B) : const Color(0xFFC47A13),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: const TextStyle(color: Color(0xFF686878)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BehaviourCard extends StatelessWidget {
-  const _BehaviourCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: const Color(0xFFF0EFFF),
-      child: const Padding(
-        padding: EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Demo and alarm behaviour',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            SizedBox(height: 12),
-            Text(
-              '• Dhuhr demo: after 15 seconds, the alarm rings for 15 seconds.',
-            ),
-            SizedBox(height: 8),
-            Text(
-              '• When the alarm sound ends, the voice reads the real '
-              'phone time at that moment and gives the prayer message.',
-            ),
-            SizedBox(height: 8),
-            Text(
-              '• Fajr: 30-second alarm, then the current-time voice message twice.',
-            ),
-            SizedBox(height: 8),
-            Text(
-              '• Tap Stop on the alarm notification to cut sound and voice immediately.',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TodayCard extends StatelessWidget {
-  const _TodayCard({required this.result});
+class _TodayPrayerCard extends StatelessWidget {
+  const _TodayPrayerCard({required this.result, required this.translate});
 
   final PrayerSyncResult result;
+  final _Translate translate;
 
   @override
   Widget build(BuildContext context) {
-    final order = DateTime.now().weekday == DateTime.friday
+    final colors = Theme.of(context).colorScheme;
+    final isFriday = DateTime.now().weekday == DateTime.friday;
+    final order = isFriday
         ? <String>['Fajr', 'Jummah', 'Asr', 'Maghrib', 'Isha']
         : <String>['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Today’s prayer times',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              result.locationLabel,
-              style: const TextStyle(color: Color(0xFF686878)),
-            ),
-            Text(
-              result.timezone,
-              style: const TextStyle(color: Color(0xFF686878)),
-            ),
-            const SizedBox(height: 12),
-            for (final prayer in order)
-              if (result.todayTimes.containsKey(prayer))
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          prayer,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
+    final labels = <String, String>{
+      'Fajr': translate('Fajr', 'ফজর'),
+      'Dhuhr': translate('Dhuhr', 'যোহর'),
+      'Jummah': translate('Jummah', 'জুমা'),
+      'Asr': translate('Asr', 'আসর'),
+      'Maghrib': translate('Maghrib', 'মাগরিব'),
+      'Isha': translate('Isha', 'এশা'),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            translate('Today', 'আজ'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            result.locationLabel,
+            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          for (final prayer in order)
+            if (result.todayPrayerTimes.containsKey(prayer))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        labels[prayer] ?? prayer,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      Text(result.todayTimes[prayer]!),
-                    ],
-                  ),
-                ),
-            const Divider(height: 24),
-            Text('${result.scheduledCount} future alarm events scheduled.'),
-            if (result.usedFallbackLocation)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text(
-                  'Dhaka fallback is active. Grant location permission '
-                  'and refresh for your current location.',
-                  style: TextStyle(
-                    color: Color(0xFFC47A13),
-                    fontWeight: FontWeight.w700,
-                  ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${translate('Prayer time', 'নামাজের সময়')}: '
+                          '${result.todayPrayerTimes[prayer]}',
+                        ),
+                        Text(
+                          '${translate('Reminder', 'মনে করাবে')}: '
+                          '${result.todayReminderTimes[prayer]}',
+                          style: TextStyle(
+                            color: colors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-          ],
-        ),
+          const Divider(height: 24),
+          Text(
+            translate(
+              '${result.scheduledCount} upcoming reminders are saved.',
+              '${result.scheduledCount}টি আসন্ন স্মরণ সংরক্ষিত আছে।',
+            ),
+            style: TextStyle(color: colors.onSurfaceVariant),
+          ),
+          if (result.usedFallbackLocation)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                translate(
+                  'A fallback location was used. Turn on location and update for local times.',
+                  'বিকল্প অবস্থান ব্যবহার হয়েছে। স্থানীয় সময় পেতে অবস্থান চালু করে আবার আপডেট করুন।',
+                ),
+                style: TextStyle(
+                  color: colors.tertiary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

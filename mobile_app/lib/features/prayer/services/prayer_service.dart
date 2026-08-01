@@ -17,10 +17,15 @@ class PrayerTimeParser {
     if (match == null) {
       throw FormatException('Unsupported prayer time: $raw');
     }
-    return (
-      hour: int.parse(match.group(1)!),
-      minute: int.parse(match.group(2)!),
-    );
+
+    final hour = int.parse(match.group(1)!);
+    final minute = int.parse(match.group(2)!);
+
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      throw FormatException('Unsupported prayer time: $raw');
+    }
+
+    return (hour: hour, minute: minute);
   }
 }
 
@@ -29,14 +34,16 @@ class PrayerSyncResult {
     required this.locationLabel,
     required this.timezone,
     required this.scheduledCount,
-    required this.todayTimes,
+    required this.todayPrayerTimes,
+    required this.todayReminderTimes,
     required this.usedFallbackLocation,
   });
 
   final String locationLabel;
   final String timezone;
   final int scheduledCount;
-  final Map<String, String> todayTimes;
+  final Map<String, String> todayPrayerTimes;
+  final Map<String, String> todayReminderTimes;
   final bool usedFallbackLocation;
 }
 
@@ -46,9 +53,12 @@ class PrayerService {
 
   static const String _enabledKey = 'prayer_alarm_enabled';
   static const String _lastSyncKey = 'prayer_alarm_last_sync';
-  static const String _jamaatTimePrefix = 'prayer_jamaat_time_';
+  static const String _reminderTimePrefix = 'prayer_reminder_time_';
+  static const String _legacyJamaatTimePrefix = 'prayer_jamaat_time_';
+  static const String _legacyMigrationKey =
+      'prayer_reminder_time_migration_v2_complete';
 
-  static const List<String> editableJamaatKeys = <String>[
+  static const List<String> editableReminderKeys = <String>[
     'fajr',
     'dhuhr',
     'jummah',
@@ -57,22 +67,24 @@ class PrayerService {
     'isha',
   ];
 
-  static const Map<String, String> defaultJamaatTimes = <String, String>{
-    'dhuhr': '13:30',
-    'jummah': '13:30',
+  /// These are reminder times, not mosque or congregation times.
+  static const Map<String, String> defaultReminderTimes = <String, String>{
+    'dhuhr': '13:05',
+    'jummah': '12:35',
   };
-  static const double _dhakaLatitude = 23.8103;
-  static const double _dhakaLongitude = 90.4125;
 
-  static const int preparationMinutes = 20;
+  static const int automaticLeadMinutes = 10;
   static const int calculationMethod = 1;
   static const int asrSchool = 1;
   static const int scheduleHorizonDays = 30;
 
-  static const int dhuhrHour = 13;
-  static const int dhuhrMinute = 30;
-  static const int jummahHour = 13;
-  static const int jummahMinute = 30;
+  static const String banglaReminderMessage =
+      'নামাজের সময় হয়ে যাচ্ছে। আপনারা নামাজের প্রস্তুতি নিন।';
+  static const String englishReminderMessage =
+      'Prayer time is approaching. Please prepare for prayer.';
+
+  static const double _dhakaLatitude = 23.8103;
+  static const double _dhakaLongitude = 90.4125;
 
   final http.Client _client;
   final PrayerAlarmBridge _bridge;
@@ -85,6 +97,7 @@ class PrayerService {
   Future<void> setEnabled(bool value) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool(_enabledKey, value);
+
     if (!value) {
       await _bridge.cancelAll();
     }
@@ -96,13 +109,16 @@ class PrayerService {
     return value == null ? null : DateTime.tryParse(value);
   }
 
-  Future<Map<String, String>> loadJamaatTimes() async {
+  Future<Map<String, String>> loadReminderTimes() async {
     final preferences = await SharedPreferences.getInstance();
+    await _removeLegacyJamaatPreferences(preferences);
 
-    final result = <String, String>{...defaultJamaatTimes};
+    final result = <String, String>{...defaultReminderTimes};
 
-    for (final prayerKey in editableJamaatKeys) {
-      final savedValue = preferences.getString('$_jamaatTimePrefix$prayerKey');
+    for (final prayerKey in editableReminderKeys) {
+      final savedValue = preferences.getString(
+        '$_reminderTimePrefix$prayerKey',
+      );
 
       if (savedValue != null && savedValue.trim().isNotEmpty) {
         PrayerTimeParser.parse(savedValue);
@@ -113,18 +129,19 @@ class PrayerService {
     return result;
   }
 
-  Future<void> saveJamaatTimes(Map<String, String?> times) async {
+  Future<void> saveReminderTimes(Map<String, String?> times) async {
     final preferences = await SharedPreferences.getInstance();
+    await _removeLegacyJamaatPreferences(preferences);
 
     for (final entry in times.entries) {
       final prayerKey = entry.key.trim().toLowerCase();
 
-      if (!editableJamaatKeys.contains(prayerKey)) {
-        throw ArgumentError('Unsupported jamaat prayer: ${entry.key}');
+      if (!editableReminderKeys.contains(prayerKey)) {
+        throw ArgumentError('Unsupported prayer reminder: ${entry.key}');
       }
 
       final value = entry.value?.trim() ?? '';
-      final preferenceKey = '$_jamaatTimePrefix$prayerKey';
+      final preferenceKey = '$_reminderTimePrefix$prayerKey';
 
       if (value.isEmpty) {
         await preferences.remove(preferenceKey);
@@ -132,15 +149,29 @@ class PrayerService {
       }
 
       PrayerTimeParser.parse(value);
-
       await preferences.setString(preferenceKey, value);
     }
   }
 
+  Future<void> _removeLegacyJamaatPreferences(
+    SharedPreferences preferences,
+  ) async {
+    if (preferences.getBool(_legacyMigrationKey) == true) {
+      return;
+    }
+
+    for (final prayerKey in editableReminderKeys) {
+      await preferences.remove('$_legacyJamaatTimePrefix$prayerKey');
+    }
+
+    await preferences.setBool(_legacyMigrationKey, true);
+  }
+
   Future<PrayerSyncResult> syncOnlineSchedule() async {
     tz_data.initializeTimeZones();
+
     final coordinates = await _resolveCoordinates();
-    final jamaatTimes = await loadJamaatTimes();
+    final reminderTimes = await loadReminderTimes();
 
     final monthlyPayloads = <Map<String, dynamic>>[];
     var cursor = DateTime(DateTime.now().year, DateTime.now().month);
@@ -158,7 +189,9 @@ class PrayerService {
     }
 
     final alarms = <Map<String, Object?>>[];
-    final todayTimes = <String, String>{};
+    final todayPrayerTimes = <String, String>{};
+    final todayReminderTimes = <String, String>{};
+
     var timezoneName = 'Asia/Dhaka';
     final now = DateTime.now();
     final horizon = now.add(const Duration(days: scheduleHorizonDays));
@@ -177,35 +210,29 @@ class PrayerService {
             apiKey: 'Fajr',
             key: 'fajr',
             english: 'Fajr',
-            bangla: 'ফজরের',
+            bangla: 'ফজর',
             index: 1,
           ),
           (
             apiKey: 'Dhuhr',
             key: 'dhuhr',
             english: 'Dhuhr',
-            bangla: 'যোহরের',
+            bangla: 'যোহর',
             index: 2,
           ),
-          (
-            apiKey: 'Asr',
-            key: 'asr',
-            english: 'Asr',
-            bangla: 'আসরের',
-            index: 3,
-          ),
+          (apiKey: 'Asr', key: 'asr', english: 'Asr', bangla: 'আসর', index: 3),
           (
             apiKey: 'Maghrib',
             key: 'maghrib',
             english: 'Maghrib',
-            bangla: 'মাগরিবের',
+            bangla: 'মাগরিব',
             index: 4,
           ),
           (
             apiKey: 'Isha',
             key: 'isha',
             english: 'Isha',
-            bangla: 'এশার',
+            bangla: 'এশা',
             index: 5,
           ),
         ];
@@ -244,118 +271,70 @@ class PrayerService {
           var displayBangla = prayer.bangla;
           var eventKey = prayer.key;
 
-          late final tz.TZDateTime prayerMoment;
+          if (prayer.key == 'dhuhr' && date.weekday == DateTime.friday) {
+            displayEnglish = 'Jummah';
+            displayBangla = 'জুমা';
+            eventKey = 'jummah';
+          }
 
-          if (prayer.key == 'dhuhr') {
-            final isFriday = date.weekday == DateTime.friday;
+          final rawTime = timings[prayer.apiKey]?.toString();
+          if (rawTime == null) {
+            continue;
+          }
 
-            if (isFriday) {
-              displayEnglish = 'Jummah';
-              displayBangla = 'জুমার';
-              eventKey = 'jummah';
+          final parsed = PrayerTimeParser.parse(rawTime);
+          final prayerMoment = tz.TZDateTime(
+            location,
+            date.year,
+            date.month,
+            date.day,
+            parsed.hour,
+            parsed.minute,
+          );
 
-              prayerMoment = tz.TZDateTime(
-                location,
-                date.year,
-                date.month,
-                date.day,
-                jummahHour,
-                jummahMinute,
-              );
-            } else {
-              prayerMoment = tz.TZDateTime(
-                location,
-                date.year,
-                date.month,
-                date.day,
-                dhuhrHour,
-                dhuhrMinute,
-              );
-            }
-          } else {
-            final rawTime = timings[prayer.apiKey]?.toString();
+          final selectedReminder = reminderTimes[eventKey];
+          final tz.TZDateTime reminderMoment;
 
-            if (rawTime == null) {
-              continue;
-            }
-
-            final parsed = PrayerTimeParser.parse(rawTime);
-
-            prayerMoment = tz.TZDateTime(
+          if (selectedReminder != null && selectedReminder.trim().isNotEmpty) {
+            final parsedReminder = PrayerTimeParser.parse(selectedReminder);
+            reminderMoment = tz.TZDateTime(
               location,
               date.year,
               date.month,
               date.day,
-              parsed.hour,
-              parsed.minute,
-            );
-          }
-
-          final savedJamaatTime = jamaatTimes[eventKey];
-
-          var effectivePrayerMoment = prayerMoment;
-
-          late final tz.TZDateTime alarmMoment;
-
-          if (savedJamaatTime != null && savedJamaatTime.trim().isNotEmpty) {
-            final parsedJamaat = PrayerTimeParser.parse(savedJamaatTime);
-
-            effectivePrayerMoment = tz.TZDateTime(
-              location,
-              date.year,
-              date.month,
-              date.day,
-              parsedJamaat.hour,
-              parsedJamaat.minute,
-            );
-
-            alarmMoment = effectivePrayerMoment.subtract(
-              const Duration(minutes: preparationMinutes),
-            );
-          } else if (eventKey == 'fajr') {
-            alarmMoment = prayerMoment.add(const Duration(minutes: 10));
-          } else if (eventKey == 'maghrib') {
-            alarmMoment = prayerMoment.subtract(const Duration(minutes: 15));
-          } else if (eventKey == 'dhuhr' || eventKey == 'jummah') {
-            alarmMoment = prayerMoment.subtract(
-              const Duration(minutes: preparationMinutes),
+              parsedReminder.hour,
+              parsedReminder.minute,
             );
           } else {
-            alarmMoment = prayerMoment;
+            reminderMoment = prayerMoment.subtract(
+              const Duration(minutes: automaticLeadMinutes),
+            );
           }
 
-          if (date.year == now.year &&
-              date.month == now.month &&
-              date.day == now.day) {
-            todayTimes[displayEnglish] = _formatClock(effectivePrayerMoment);
+          if (_isSameDate(date, now)) {
+            todayPrayerTimes[displayEnglish] = _formatClock(prayerMoment);
+            todayReminderTimes[displayEnglish] = _formatClock(reminderMoment);
           }
 
           final dateCode = (date.year * 10000) + (date.month * 100) + date.day;
+          final currentMoment = tz.TZDateTime.from(
+            now.add(const Duration(seconds: 30)),
+            location,
+          );
 
-          if (alarmMoment.isAfter(
-                tz.TZDateTime.from(
-                  now.add(const Duration(seconds: 30)),
-                  location,
-                ),
-              ) &&
-              alarmMoment.isBefore(tz.TZDateTime.from(horizon, location))) {
-            final isFajr = eventKey == 'fajr';
+          if (reminderMoment.isAfter(currentMoment) &&
+              reminderMoment.isBefore(tz.TZDateTime.from(horizon, location))) {
             alarms.add(<String, Object?>{
               'id': (dateCode * 100) + (prayer.index * 10) + 2,
-              'triggerAtMillis': alarmMoment.millisecondsSinceEpoch,
-              'title': '$displayEnglish prayer reminder',
-              'message':
-                  '$displayEnglish reminder at ${_formatClock(effectivePrayerMoment)}.',
-              'voiceBn':
-                  '$displayBangla নামাজের জন্য প্রস্তুতি নিন। '
-                  'তারপর নামাজ পড়তে যান। নামাজেই আসল সুখ।',
-              'voiceEn':
-                  'Please prepare for $displayEnglish prayer, '
-                  'then go and pray.',
+              'triggerAtMillis': reminderMoment.millisecondsSinceEpoch,
+              'title': '$displayBangla নামাজ',
+              'message': banglaReminderMessage,
+              'voiceBn': banglaReminderMessage,
+              'voiceEn': englishReminderMessage,
               'prayerBn': displayBangla,
               'prayerEn': displayEnglish,
-              'durationSeconds': isFajr ? 30 : 15,
-              'voiceRepeat': isFajr ? 2 : 1,
+              'durationSeconds': 15,
+              'voiceRepeat': 1,
               'prayerKey': eventKey,
               'eventType': 'prayer_reminder',
             });
@@ -372,6 +351,7 @@ class PrayerService {
 
     final scheduledCount = await _bridge.scheduleAlarms(alarms);
     final preferences = await SharedPreferences.getInstance();
+
     await preferences.setBool(_enabledKey, true);
     await preferences.setString(_lastSyncKey, DateTime.now().toIso8601String());
 
@@ -379,7 +359,8 @@ class PrayerService {
       locationLabel: coordinates.locationLabel,
       timezone: timezoneName,
       scheduledCount: scheduledCount,
-      todayTimes: todayTimes,
+      todayPrayerTimes: todayPrayerTimes,
+      todayReminderTimes: todayReminderTimes,
       usedFallbackLocation: coordinates.usedFallback,
     );
   }
@@ -404,6 +385,7 @@ class PrayerService {
     final response = await _client
         .get(uri)
         .timeout(const Duration(seconds: 20));
+
     if (response.statusCode != 200) {
       throw StateError('Prayer API returned HTTP ${response.statusCode}.');
     }
@@ -419,6 +401,7 @@ class PrayerService {
         payload['status']?.toString() ?? 'Prayer API request failed.',
       );
     }
+
     return payload;
   }
 
@@ -433,12 +416,26 @@ class PrayerService {
   _resolveCoordinates() async {
     try {
       var permission = await Geolocator.checkPermission();
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        final lastKnown = await Geolocator.getLastKnownPosition();
+
+        if (lastKnown != null) {
+          return (
+            latitude: lastKnown.latitude,
+            longitude: lastKnown.longitude,
+            locationLabel:
+                '${lastKnown.latitude.toStringAsFixed(4)}, '
+                '${lastKnown.longitude.toStringAsFixed(4)}',
+            usedFallback: true,
+          );
+        }
+
         return (
           latitude: _dhakaLatitude,
           longitude: _dhakaLongitude,
@@ -448,6 +445,19 @@ class PrayerService {
       }
 
       if (!await Geolocator.isLocationServiceEnabled()) {
+        final lastKnown = await Geolocator.getLastKnownPosition();
+
+        if (lastKnown != null) {
+          return (
+            latitude: lastKnown.latitude,
+            longitude: lastKnown.longitude,
+            locationLabel:
+                '${lastKnown.latitude.toStringAsFixed(4)}, '
+                '${lastKnown.longitude.toStringAsFixed(4)}',
+            usedFallback: true,
+          );
+        }
+
         return (
           latitude: _dhakaLatitude,
           longitude: _dhakaLongitude,
@@ -467,7 +477,8 @@ class PrayerService {
         latitude: position.latitude,
         longitude: position.longitude,
         locationLabel:
-            '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
+            '${position.latitude.toStringAsFixed(4)}, '
+            '${position.longitude.toStringAsFixed(4)}',
         usedFallback: false,
       );
     } catch (_) {
@@ -484,6 +495,7 @@ class PrayerService {
     final dateMap = _readMap(day['date']);
     final gregorian = _readMap(dateMap['gregorian']);
     final source = gregorian['date']?.toString();
+
     if (source == null) {
       throw const FormatException('Prayer date is missing.');
     }
@@ -504,17 +516,25 @@ class PrayerService {
     if (value is Map<String, dynamic>) {
       return value;
     }
+
     if (value is Map) {
       return Map<String, dynamic>.from(value);
     }
+
     return <String, dynamic>{};
+  }
+
+  bool _isSameDate(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
   }
 
   String _formatClock(DateTime value) {
     final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
     final minute = value.minute.toString().padLeft(2, '0');
-    final suffix = value.hour >= 12 ? 'PM' : 'AM';
-    return '$hour:$minute $suffix';
+    final period = value.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
   }
 
   void dispose() {
